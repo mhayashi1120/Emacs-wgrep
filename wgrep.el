@@ -1,9 +1,9 @@
 ;;; wgrep --- Make writable grep buffer and apply the changes to files
 ;; -*- Mode: Emacs-Lisp -*-
 
-;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
+;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: grep edit
-;; URL: http://github.com/mhayashi1120/wgrep-el/raw/master/wgrep.el
+;; URL: http://gist.github.com/520805.txt
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -39,9 +39,9 @@
 ;; Following added implementations and differences.
 ;; * Support grep option -A (--after-context) -B (--before-context)
 ;; * Some bugfix. (wrong coloring text etc..)
-;; * wdired like interface.
+;; * wdired.el like interface.
 ;; * Remove all advise.
-;; * Bind to local variables.
+;; * Bind to local variables. (grep-a-lot.el works well)
 
 ;; Usage:
 ;; You can edit the text on *grep* buffer after type C-c C-p.
@@ -49,12 +49,14 @@
 ;; Then, type C-c C-e to apply the highlighting changes
 ;; to files.
 
-;; C-c C-e : apply the highlighting changes to files.
-;; C-c C-u : All changes are ignored
+;; C-c C-e : apply the highlighting changes to file buffers.
+;; C-c C-u : All changes are unmarked and ignored.
 ;; C-c C-r : Remove the highlight in the region (The Changes doesn't
 ;; apply to files. Of course, if you type C-c C-e, the remained
 ;; highlight changes are applied to files.)
 
+;;; TODO
+;; * remove readonly when editing buffer irritated like .svn line.
 
 ;;; History:
 ;; 

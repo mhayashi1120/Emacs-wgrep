@@ -55,9 +55,6 @@
 ;; apply to files. Of course, if you type C-c C-e, the remained
 ;; highlight changes are applied to files.)
 
-;;; TODO
-;; * remove readonly when editing buffer irritated like .svn line.
-
 ;;; History:
 ;; 
 

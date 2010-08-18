@@ -42,6 +42,7 @@
 ;; * wdired.el like interface.
 ;; * Remove all advise.
 ;; * Bind to local variables. (grep-a-lot.el works well)
+;; * After save buffer, colored face will be removed.
 
 ;; Usage:
 ;; You can edit the text on *grep* buffer after type C-c C-p.

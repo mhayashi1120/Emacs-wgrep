@@ -213,6 +213,15 @@
     nil)
    (t t)))
 
+;; not consider other edit. (ex: Undo or self-insert-command)
+(defun wgrep-after-save-hook ()
+  (remove-hook 'after-save-hook 'wgrep-after-save-hook t)
+  (mapc
+   (lambda (ov)
+     (delete-overlay ov))
+   wgrep-file-overlays)
+  (kill-local-variable 'wgrep-file-overlays))
+
 (defun wgrep-apply-to-buffer (line new-text)
   "*The changes on the grep buffer apply to the file"
   (let ((inhibit-read-only wgrep-change-readonly-file))
@@ -229,6 +238,7 @@
                   (+ 1 (line-end-position)))))
     (overlay-put ov 'face 'wgrep-file-face)
     (overlay-put ov 'priority 0)
+    (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)
     (setq wgrep-file-overlays (cons ov wgrep-file-overlays))))
 
 (defun wgrep-put-done-face ()

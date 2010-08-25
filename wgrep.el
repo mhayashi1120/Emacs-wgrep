@@ -53,6 +53,9 @@
 ;; Wgrep feature turn-on/turn-off by
 ;;   M-x wgrep-toggle-feature
 
+;; Save all buffers that wgrep changed,
+;;   M-x wgrep-save-all-buffers
+
 ;; C-c C-e : apply the highlighting changes to file buffers.
 ;; C-c C-u : All changes are unmarked and ignored.
 ;; C-c C-r : Remove the highlight in the region (The Changes doesn't
@@ -65,6 +68,7 @@
 ;;; TODO
 ;; * can undo region.
 ;; * can remove whole line.
+;; * When applying buffer is modified.
 
 ;;; Code:
 
@@ -156,6 +160,9 @@
 	  (define-key map "\C-c\C-r" 'wgrep-remove-change)
 	  (define-key map "\C-x\C-s" 'wgrep-finish-edit)
 	  (define-key map "\C-c\C-u" 'wgrep-remove-all-change)
+	  (define-key map "\C-c\C-[" 'wgrep-remove-all-change)
+	  (define-key map "\C-c\C-k" 'wgrep-abort-changes)
+	  (define-key map "\C-x\C-q" 'wgrep-exit)
 	  (define-key map "\C-m"     'ignore)
 	  (define-key map "\C-j"     'ignore)
 	  (define-key map "\C-o"     'ignore)
@@ -310,8 +317,8 @@
 	(let ((ov (car wgrep-overlays))
 	      local-buf done info)
 	  (setq wgrep-overlays (cdr wgrep-overlays))
-	  (if (= (overlay-start ov) (overlay-end ov))
-	      ;; ignore removed line
+	  (if (eq (overlay-start ov) (overlay-end ov))
+	      ;; ignore removed line and removed overlay
 	      (setq done t)
 	    (goto-char (overlay-start ov))
 	    (when (setq info (wgrep-get-info))
@@ -338,6 +345,22 @@
     (message "There is unapplied change."))
    (t
     (message "There are %d unapplied changes." (length wgrep-overlays)))))
+
+(defun wgrep-exit ()
+  "Return to `grep-mode'"
+  (interactive)
+  (if (and (buffer-modified-p)
+	   (y-or-n-p (format "Buffer %s modified; save changes? "
+			     (current-buffer))))
+      (wgrep-finish-edit)
+    (wgrep-abort-changes)))
+
+(defun wgrep-abort-changes ()
+  "Discard all changes and return to `grep-mode'"
+  (interactive)
+  (wgrep-remove-all-change)
+  (wgrep-to-grep-mode)
+  (message "Changes aborted"))
 
 (defun wgrep-remove-change (beg end)
   "Remove color the region between BEG and END."
@@ -371,7 +394,8 @@
   (set-buffer-modified-p nil)
   (setq buffer-undo-list nil)
   (message "%s" (substitute-command-keys
-		 "Press \\[wgrep-finish-edit] when finished")))
+		 "Press \\[wgrep-finish-edit] when finished \
+or \\[wgrep-abort-changes] to abort changes.")))
 
 (defun wgrep-toggle-readonly-area ()
   "Toggle read-only area to remove whole line.
@@ -401,6 +425,27 @@ Example:
   (if (setq wgrep-enabled (not wgrep-enabled))
       (message "Wgrep is enabled.")
     (message "Wgrep is **disabled**.")))
+
+(defun wgrep-save-all-buffers ()
+  "Save buffers wgrep changed."
+  (interactive)
+  (let ((count 0))
+    (mapc
+     (lambda (b)
+       (with-current-buffer b
+	 (when (and (local-variable-p 'wgrep-file-overlays)
+		    wgrep-file-overlays
+		    (buffer-modified-p))
+	   (basic-save-buffer)
+	   (incf count))))
+     (buffer-list))
+    (cond
+     ((= count 0)
+      (message "No buffer is saved."))
+     ((= count 1)
+      (message "Buffer is saved."))
+     (t
+      (message "%d Buffers are saved." count)))))
 
 (defun wgrep-initialize-buffer ()
   (save-excursion

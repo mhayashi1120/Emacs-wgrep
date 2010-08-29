@@ -4,6 +4,7 @@
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: grep edit result writable
 ;; URL: http://gist.github.com/520805.txt
+;; URL: http://www.emacswiki.org/download/wgrep.el
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -23,7 +24,7 @@
 ;;; Commentary:
 
 ;; wgrep provides to edit grep buffer and to apply the changes to
-;; the file.
+;; the file buffer.
 ;;
 
 ;;; Install:
@@ -40,17 +41,18 @@
 ;; * Support grep option -A (--after-context) -B (--before-context)
 ;; * Some bugfix. (wrong coloring text etc..)
 ;; * wdired.el like interface.
-;; * Remove all advise.
+;; * Remove all advice.
 ;; * Bind to local variables. (grep-a-lot.el works well)
 ;; * After save buffer, colored face will be removed.
 
 ;; Usage:
+
 ;; You can edit the text on *grep* buffer after type C-c C-p.
 ;; After that the changed text is highlighted.
 ;; Then, type C-c C-e to apply the highlighting changes
 ;; to files.
 
-;; Wgrep feature turn-on/turn-off by
+;; Wgrep feature turn on/off by
 ;;   M-x wgrep-toggle-feature
 
 ;; Save all buffers that wgrep changed,
@@ -228,7 +230,7 @@
 	(unless inhibit-it
 	  (setq ov (wgrep-make-overlay
 		    (line-beginning-position)
-		    (+ 1 (line-end-position))))
+		    (line-end-position)))
 	  (overlay-put ov 'face 'wgrep-face)
 	  (overlay-put ov 'priority 0)
 	  (setq wgrep-overlays (cons ov wgrep-overlays))))))))
@@ -283,7 +285,7 @@
   "*Highlight the changed line of the file"
   (let ((ov (wgrep-make-overlay
 	     (line-beginning-position)
-	     (+ 1 (line-end-position)))))
+	     (line-end-position))))
     (overlay-put ov 'face 'wgrep-file-face)
     (overlay-put ov 'priority 0)
     (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)
@@ -291,13 +293,13 @@
 
 (defun wgrep-put-done-face ()
   (when (looking-at wgrep-line-file-regexp)
-    (let ((ov (wgrep-make-overlay (match-end 0) (+ 1 (line-end-position)))))
+    (let ((ov (wgrep-make-overlay (match-end 0) (line-end-position))))
       (overlay-put ov 'face 'wgrep-done-face)
       (overlay-put ov 'priority 0))))
 
 (defun wgrep-put-reject-face ()
   (when (looking-at wgrep-line-file-regexp)
-    (let ((ov (wgrep-make-overlay (match-end 0) (+ 1 (line-end-position)))))
+    (let ((ov (wgrep-make-overlay (match-end 0) (line-end-position))))
       (overlay-put ov 'face 'wgrep-reject-face)
       (overlay-put ov 'priority 0))))
 
@@ -312,7 +314,7 @@
   "Apply changed text to file buffers."
   (interactive)
   (save-excursion
-    (let (undone-overlays)
+    (let (not-yet-overlays)
       (while wgrep-overlays
 	(let ((ov (car wgrep-overlays))
 	      local-buf done info)
@@ -334,9 +336,9 @@
 		(wgrep-put-reject-face))))
 	  (if done
 	      (delete-overlay ov)
-	    (setq undone-overlays (cons ov undone-overlays)))))
+	    (setq not-yet-overlays (cons ov not-yet-overlays)))))
       ;; restore overlays
-      (setq wgrep-overlays undone-overlays)))
+      (setq wgrep-overlays not-yet-overlays)))
   (wgrep-to-grep-mode)
   (cond
    ((null wgrep-overlays)

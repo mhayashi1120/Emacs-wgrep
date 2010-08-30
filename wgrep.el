@@ -34,18 +34,7 @@
 ;;
 ;;     (require 'wgrep)
 
-;; This program is forked version. Original version can be downloaded from
-;; http://www.bookshelf.jp/elc/grep-edit.el
-
-;; Following added implementations and differences.
-;; * Support grep option -A (--after-context) -B (--before-context)
-;; * Some bugfix. (wrong coloring text etc..)
-;; * wdired.el like interface.
-;; * Remove all advice.
-;; * Bind to local variables. (grep-a-lot.el works well)
-;; * After save buffer, colored face will be removed.
-
-;; Usage:
+;;; Usage:
 
 ;; You can edit the text on *grep* buffer after type C-c C-p.
 ;; After that the changed text is highlighted.
@@ -65,9 +54,20 @@
 ;; highlight changes are applied to files.)
 
 ;;; History:
-;; 
 
-;;; TODO
+;; This program is forked version. Original version can be downloaded from
+;; http://www.bookshelf.jp/elc/grep-edit.el
+
+;; Following added implementations and differences.
+;; * Support grep option -A (--after-context) -B (--before-context)
+;; * Some bugfix. (wrong coloring text etc..)
+;; * wdired.el like interface.
+;; * Remove all advice.
+;; * Bind to local variables. (grep-a-lot.el works well)
+;; * After save buffer, colored face will be removed.
+
+;;; TODO:
+
 ;; * can undo region.
 ;; * can remove whole line.
 ;; * When applying buffer is modified.

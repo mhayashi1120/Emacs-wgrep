@@ -41,10 +41,10 @@
 ;; Then, type C-c C-e to apply the highlighting changes
 ;; to files.
 
-;; Wgrep feature turn on/off by
+;; To turn on/off the feature by
 ;;   M-x wgrep-toggle-feature
 
-;; Save all buffers that wgrep changed,
+;; To save all buffers that wgrep changed by
 ;;   M-x wgrep-save-all-buffers
 
 ;; C-c C-e : apply the highlighting changes to file buffers.

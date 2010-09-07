@@ -1,5 +1,4 @@
 ;;; wgrep --- Writable grep buffer and apply the changes to files
-;; -*- Mode: Emacs-Lisp -*-
 
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: grep edit result writable
@@ -25,12 +24,11 @@
 
 ;; wgrep provides to edit grep buffer and to apply the changes to
 ;; the file buffer.
-;;
 
 ;;; Install:
 
 ;; Put this file into load-path'ed directory, and byte compile it if
-;; desired.  And put the following expression into your ~/.emacs.
+;; desired. And put the following expression into your ~/.emacs.
 ;;
 ;;     (require 'wgrep)
 
@@ -84,6 +82,11 @@
   "*Non-nil means to change read only files."
   :group 'wgrep
   :type 'boolean)
+
+(defcustom wgrep-enable-key "\C-c\C-p"
+  "*Key to enable `wgrep-mode'."
+  :type 'string  
+  :group 'wgrep)
 
 (defvar wgrep-setup-hook nil
   "Hooks run when setup to wgrep.")
@@ -174,7 +177,7 @@
 (defun wgrep-setup ()
   (if wgrep-enabled
       (progn
-	(define-key grep-mode-map "\C-c\C-p" 'wgrep-to-wgrep-mode)
+	(define-key grep-mode-map wgrep-enable-key 'wgrep-to-wgrep-mode)
 	(if (boundp 'compilation-finish-functions)
 	    (add-hook 'compilation-finish-functions 'wgrep-finish-function nil t)
 	  ;; this works Emacs 22.1 or earlier
@@ -541,5 +544,4 @@ Example:
 
 (provide 'wgrep)
 
-;;; end
 ;;; wgrep.el ends here

@@ -100,10 +100,10 @@
 (defface wgrep-face
   '((((class color)
       (background dark))
-     (:background "SlateGray1" :bold t :foreground "Black"))
+     (:background "SlateGray1" :weight bold :foreground "Black"))
     (((class color)
       (background light))
-     (:background "ForestGreen" :bold t))
+     (:background "ForestGreen" :weight bold))
     (t
      ()))
   "*Face used for the changed text on grep buffer."
@@ -112,10 +112,10 @@
 (defface wgrep-file-face
   '((((class color)
       (background dark))
-     (:background "gray30" :bold t))
+     (:background "gray30" :weight bold))
     (((class color)
       (background light))
-     (:background "ForestGreen" :bold t))
+     (:background "ForestGreen" :weight bold))
     (t
      ()))
   "*Face used for the changed text on file buffer."
@@ -124,10 +124,10 @@
 (defface wgrep-reject-face
   '((((class color)
       (background dark))
-     (:foreground "hot pink" :bold t))
+     (:foreground "hot pink" :weight bold))
     (((class color)
       (background light))
-     (:foreground "red" :bold t))
+     (:foreground "red" :weight bold))
     (t
      ()))
   "*Face used for the line on grep buffer that can not apply to file."
@@ -136,10 +136,10 @@
 (defface wgrep-done-face
   '((((class color)
       (background dark))
-     (:foreground "LightSkyBlue" :bold t))
+     (:foreground "LightSkyBlue" :weight bold))
     (((class color)
       (background light))
-     (:foreground "blue" :bold t))
+     (:foreground "blue" :weight bold))
     (t
      ()))
   "*Face used for the line on grep buffer that can apply to file."

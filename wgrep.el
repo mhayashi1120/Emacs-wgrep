@@ -228,7 +228,7 @@
 
 (defun wgrep-get-info ()
   (beginning-of-line)
-  (when (looking-at (concat wgrep-line-file-regexp "\\([^\n]+$\\)"))
+  (when (looking-at (concat wgrep-line-file-regexp "\\([^\n]*$\\)"))
     (let ((name (match-string-no-properties 1))
 	  (line (match-string-no-properties 3))
 	  (text (match-string-no-properties 4)))

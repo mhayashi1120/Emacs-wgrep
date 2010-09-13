@@ -502,8 +502,7 @@ Example:
     (let ((inhibit-read-only t))
       (while (looking-at (format "^%s\\(-\\)%d\\(-\\)" filename next))
 	(setq line-head (format "%s:%d:" filename next))
-	(set-text-properties 0 (length line-head)
-			     '(read-only t rear-nonsticky t) line-head)
+	(wgrep-set-readonly-property 0 (length line-head) line-head)
 	(replace-match line-head nil nil nil 0)
 	;; -A -B output may be misunderstood and set read-only.
 	;; (ex: filename-20-2010/01/01 23:59:99)
@@ -528,10 +527,18 @@ Example:
   (save-excursion
     (let ((inhibit-read-only t)
 	  (regexp (format "\\(?:%s\\|\n\\)" wgrep-line-file-regexp)))
+      ;; backward to previous read-only
       (while (and (re-search-backward regexp nil t)
 		  (not (get-text-property (point) 'read-only)))
-	(set-text-properties (match-beginning 0)
-			     (match-end 0) '(read-only t rear-nonsticky t))))))
+	(wgrep-set-readonly-property (match-beginning 0)
+				      (match-end 0))))))
+
+(defun wgrep-set-readonly-property (start end &optional object)
+  (set-text-properties start end '(read-only t) object)
+  ;; This means grep header (filename and line num) that rear is editable text.
+  ;; Header text length must be greater than 2.
+  (when (> end (1+ start))
+    (add-text-properties (1- end) end '(rear-nonsticky t) object)))
 
 (defun wgrep-finish-function (buffer msg)
   (when (with-current-buffer buffer

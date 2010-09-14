@@ -299,9 +299,11 @@
 	(inhibit-it nil)
 	ov)
     (save-excursion
-      (forward-line 0)
-      (when (looking-at wgrep-line-file-regexp)
-	(setq inhibit-it (> (match-end 0) beg))))
+      ;; looking-at destroy replace regexp..
+      (save-match-data
+	(forward-line 0)
+	(when (looking-at wgrep-line-file-regexp)
+	  (setq inhibit-it (> (match-end 0) beg)))))
     (unless inhibit-it
       (while ovs
 	(if (overlay-get (car ovs) 'wgrep)

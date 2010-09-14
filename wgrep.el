@@ -3,7 +3,7 @@
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-Lisp/raw/master/wgrep.el
-;; URL: http://www.emacswiki.org/download/wgrep.el
+;; URL: http://www.emacswiki.org/cgi-bin/wiki/download/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
 
 ;; This program is free software; you can redistribute it and/or

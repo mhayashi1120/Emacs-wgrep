@@ -70,7 +70,6 @@
 
 ;;; TODO:
 
-;; * can undo region.
 ;; * can remove whole line. (In file buffer)
 
 ;;; Code:
@@ -339,23 +338,31 @@
     (save-match-data
       (forward-line 0)
       (let ((inhibit-it nil)
-	    ovs ov)
+	    header value origin ovs ov)
 	(when (looking-at wgrep-line-file-regexp)
+	  ;; check file name point or not
 	  (setq inhibit-it (> (match-end 0) beg))
+	  (setq header (match-string-no-properties 0))
+	  (setq value (buffer-substring-no-properties 
+		       (match-end 0) (line-end-position)))
 	  (unless inhibit-it
 	    (setq ovs (overlays-in (line-beginning-position) (line-end-position)))
 	    (while ovs
-	      (if (overlay-get (car ovs) 'wgrep-changed)
-		  (setq inhibit-it t))
+	      (when (overlay-get (car ovs) 'wgrep-changed)
+		(when (string= (overlay-get (car ovs) 'wgrep-original-value) value)
+		  (setq wgrep-overlays (remove (car ovs) wgrep-overlays))
+		  (delete-overlay (car ovs)))
+		(setq inhibit-it t))
 	      (setq ovs (cdr ovs))))
 	  (unless inhibit-it
+	    (setq origin (wgrep-get-original-value header))
 	    (setq ov (wgrep-make-overlay
 		      (line-beginning-position)
 		      (line-end-position)))
 	    (overlay-put ov 'wgrep-changed t)
 	    (overlay-put ov 'face 'wgrep-face)
 	    (overlay-put ov 'priority 0)
-	    (overlay-put ov 'wgrep-original-value (wgrep-current-original-value))
+	    (overlay-put ov 'wgrep-original-value origin)
 	    (setq wgrep-overlays (cons ov wgrep-overlays))))))))
 
 (defun wgrep-to-grep-mode ()
@@ -733,14 +740,13 @@ When huge *grep* buffer, freezing several minutes.
     (when (looking-at wgrep-line-file-regexp)
       (match-string-no-properties 0))))
 
-(defun wgrep-current-original-value ()
-  (let ((header (wgrep-current-header)))
-    (when (and wgrep-each-other-buffer
-	       (buffer-live-p wgrep-each-other-buffer))
-      (with-current-buffer wgrep-each-other-buffer
-	(goto-char (point-min))
-	(when (re-search-forward (concat "^" (regexp-quote header)) nil t)
-	  (buffer-substring (point) (line-end-position)))))))
+(defun wgrep-get-original-value (header)
+  (when (and wgrep-each-other-buffer
+	     (buffer-live-p wgrep-each-other-buffer))
+    (with-current-buffer wgrep-each-other-buffer
+      (goto-char (point-min))
+      (when (re-search-forward (concat "^" (regexp-quote header)) nil t)
+	(buffer-substring-no-properties (point) (line-end-position))))))
 
 (provide 'wgrep)
 

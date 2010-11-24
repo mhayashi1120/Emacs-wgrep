@@ -302,6 +302,12 @@
       (save-restriction
 	(widen)
 	(wgrep-goto-line line)
+	;;FIXME simply do this?
+	(when (and (= line 1) 
+		   buffer-file-coding-system
+		   (coding-system-get buffer-file-coding-system :bom))
+	  (setq old-text (wgrep-string-replace-bom old-text buffer-file-coding-system))
+	  (setq new-text (wgrep-string-replace-bom new-text buffer-file-coding-system)))
 	(unless (string= old-text
 			 (buffer-substring (line-beginning-position) (line-end-position)))
 	  (signal 'wgrep-error "Buffer was changed after grep."))
@@ -310,6 +316,17 @@
 	(insert new-text)
 	;; hilight the changed line
 	(wgrep-put-color-file)))))
+
+;;Hack function
+(defun wgrep-string-replace-bom (string cs)
+  (let ((regexp (car (rassq (coding-system-base cs) auto-coding-regexp-alist)))
+	str)
+    ;;FIXME use find-operation-coding-system?
+    (if (and regexp 
+	     (setq str (encode-coding-string string (terminal-coding-system)))
+	     (string-match regexp str))
+	(substring str (match-end 0))
+      string)))
 
 (defun wgrep-put-color-file ()
   "*Highlight the changed line of the file"

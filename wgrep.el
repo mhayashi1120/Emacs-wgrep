@@ -161,6 +161,10 @@
 (defvar wgrep-each-other-buffer nil)
 (make-variable-buffer-local 'wgrep-each-other-buffer)
 
+;; Suppress elint warning
+;; GNU Emacs have this variable at least version 21 or later
+(defvar auto-coding-regexp-alist)
+
 (defvar wgrep-enabled-filter t)
 
 (defconst wgrep-line-file-regexp (caar grep-regexp-alist))
@@ -170,59 +174,61 @@
 (defvar wgrep-mode-map nil)
 (unless wgrep-mode-map
   (setq wgrep-mode-map
-	(let ((map (make-sparse-keymap)))
+        (let ((map (make-sparse-keymap)))
 
-	  (define-key map "\C-c\C-c" 'wgrep-finish-edit)
-	  (define-key map "\C-c\C-e" 'wgrep-finish-edit)
-	  (define-key map "\C-c\C-p" 'wgrep-toggle-readonly-area)
-	  (define-key map "\C-c\C-r" 'wgrep-remove-change)
-	  (define-key map "\C-x\C-s" 'wgrep-finish-edit)
-	  (define-key map "\C-c\C-u" 'wgrep-remove-all-change)
-	  (define-key map "\C-c\C-[" 'wgrep-remove-all-change)
-	  (define-key map "\C-c\C-k" 'wgrep-abort-changes)
-	  (define-key map "\C-x\C-q" 'wgrep-exit)
-	  (define-key map "\C-m"     'ignore)
-	  (define-key map "\C-j"     'ignore)
-	  (define-key map "\C-o"     'ignore)
+          (define-key map "\C-c\C-c" 'wgrep-finish-edit)
+          (define-key map "\C-c\C-e" 'wgrep-finish-edit)
+          (define-key map "\C-c\C-p" 'wgrep-toggle-readonly-area)
+          (define-key map "\C-c\C-r" 'wgrep-remove-change)
+          (define-key map "\C-x\C-s" 'wgrep-finish-edit)
+          (define-key map "\C-c\C-u" 'wgrep-remove-all-change)
+          (define-key map "\C-c\C-[" 'wgrep-remove-all-change)
+          (define-key map "\C-c\C-k" 'wgrep-abort-changes)
+          (define-key map "\C-x\C-q" 'wgrep-exit)
+          (define-key map "\C-m"     'ignore)
+          (define-key map "\C-j"     'ignore)
+          (define-key map "\C-o"     'ignore)
 
-	  map)))
+          map)))
 
 (defun wgrep-setup ()
   (if wgrep-enabled-filter
       (progn
-	(define-key grep-mode-map wgrep-enable-key 'wgrep-to-wgrep-mode)
-	(if (boundp 'compilation-finish-functions)
-	    (add-hook 'compilation-finish-functions 'wgrep-finish-function nil t)
-	  ;; this works Emacs 22.1 or earlier
-	  (set (make-local-variable 'compilation-finish-function) 'wgrep-finish-function))
-	(add-hook 'compilation-filter-hook 'wgrep-grep-filter nil t)
-	(run-hooks 'wgrep-setup-hook))
+        (define-key grep-mode-map wgrep-enable-key 'wgrep-to-wgrep-mode)
+        (if (boundp 'compilation-finish-functions)
+            (add-hook 'compilation-finish-functions 'wgrep-finish-function nil t)
+          ;; this works Emacs 22.1 or earlier
+          (set (make-local-variable 'compilation-finish-function) 'wgrep-finish-function))
+        (add-hook 'compilation-filter-hook 'wgrep-grep-filter nil t)
+        (run-hooks 'wgrep-setup-hook))
     (mapc
      (lambda (x)
        (define-key grep-mode-map x 'wgrep-change-to-wgrep-mode))
      (where-is-internal 'wgrep-to-wgrep-mode grep-mode-map))
     (if (boundp 'compilation-finish-functions)
-	(remove-hook 'compilation-finish-functions 'wgrep-finish-function t)
+        (remove-hook 'compilation-finish-functions 'wgrep-finish-function t)
       (when (and (local-variable-p 'compilation-finish-function)
-		 (eq compilation-finish-function 'wgrep-finish-function))
-	(kill-local-variable 'compilation-finish-function)))
+                 (eq compilation-finish-function 'wgrep-finish-function))
+        (kill-local-variable 'compilation-finish-function)))
     (remove-hook 'compilation-filter-hook 'wgrep-grep-filter t))
+  ;; delete previous wgrep overlays
+  (wgrep-cleanup-overlays (point-min) (point-max))
   (remove-hook 'post-command-hook 'wgrep-maybe-echo-error-at-point t))
 
 (defun wgrep-maybe-echo-error-at-point ()
   (when (null (current-message))
     (let ((o (find-if
-	      (lambda (o)
-		(overlay-get o 'wgrep-reject-message))
-	      (overlays-in (line-beginning-position) (line-end-position)))))
+              (lambda (o)
+                (overlay-get o 'wgrep-reject-message))
+              (overlays-in (line-beginning-position) (line-end-position)))))
       (when o
-	(let (message-log-max)
-	  (message "%s" (overlay-get o 'wgrep-reject-message)))))))
+        (let (message-log-max)
+          (message "%s" (overlay-get o 'wgrep-reject-message)))))))
 
 (defun wgrep-set-readonly-area (state)
   (let ((inhibit-read-only t)
-	(regexp (format "\\(?:%s\\|\n\\)" wgrep-line-file-regexp))
-	beg end)
+        (regexp (format "\\(?:%s\\|\n\\)" wgrep-line-file-regexp))
+        beg end)
     (save-excursion
       (wgrep-goto-first-found)
       (while (re-search-forward regexp nil t)
@@ -237,10 +243,10 @@
       ;; cleanup when first executing
       (mapc
        (lambda (o)
-	 (delete-overlay o))
+         (delete-overlay o))
        (remove-if-not 
-	(lambda (o) (overlay-get o 'wgrep))
-	(overlays-in (point-min) (point-max)))))
+        (lambda (o) (overlay-get o 'wgrep))
+        (overlays-in (point-min) (point-max)))))
      (t
       (wgrep-put-change-face beg end)))))
 
@@ -248,22 +254,22 @@
   (forward-line 0)
   (when (looking-at (concat wgrep-line-file-regexp "\\([^\n]*$\\)"))
     (let ((name (match-string-no-properties 1))
-	  (line (match-string-no-properties 3))
-	  (text (match-string-no-properties 4))
-	  (start (match-beginning 4))
-	  ov)
+          (line (match-string-no-properties 3))
+          (text (match-string-no-properties 4))
+          (start (match-beginning 4))
+          ov)
       (setq ov
-	    (or
-	     ;; get existing overlay
-	     (find-if 
-	      (lambda (o)
-		(memq (overlay-get o 'face) '(wgrep-reject-face wgrep-done-face)))
-	      (overlays-in start (line-end-position)))
-	     (wgrep-make-overlay start (line-end-position))))
+            (or
+             ;; get existing overlay
+             (find-if 
+              (lambda (o)
+                (memq (overlay-get o 'face) '(wgrep-reject-face wgrep-done-face)))
+              (overlays-in start (line-end-position)))
+             (wgrep-make-overlay start (line-end-position))))
       (list (expand-file-name name default-directory)
-	    (string-to-number line)
-	    text
-	    ov))))
+            (string-to-number line)
+            text
+            ov))))
 
 (put 'wgrep-error 'error-conditions '(wgrep-error error))
 (put 'wgrep-error 'error-message "Applying error.")
@@ -279,7 +285,7 @@
 (defun wgrep-check-buffer ()
   "Check the file status. If it is possible to change file, return t"
   (when (and (not wgrep-change-readonly-file)
-	     buffer-read-only)
+             buffer-read-only)
     (signal 'wgrep-error (format "Buffer \"%s\" is read-only." (buffer-name)))))
 
 ;; not consider other edit. (ex: Undo or self-insert-command)
@@ -295,44 +301,44 @@
   "*The changes on the grep buffer apply to the file"
   (with-current-buffer buffer
     (let ((line (nth 1 info))
-	  (new-text (nth 2 info))
-	  (result (nth 3 info))
-	  (inhibit-read-only wgrep-change-readonly-file))
+          (new-text (nth 2 info))
+          (result (nth 3 info))
+          (inhibit-read-only wgrep-change-readonly-file))
       (wgrep-check-buffer)
       (save-restriction
-	(widen)
-	(wgrep-goto-line line)
-	;;FIXME simply do this?
-	(when (and (= line 1) 
-		   buffer-file-coding-system
-		   (coding-system-get buffer-file-coding-system :bom))
-	  (setq old-text (wgrep-string-replace-bom old-text buffer-file-coding-system))
-	  (setq new-text (wgrep-string-replace-bom new-text buffer-file-coding-system)))
-	(unless (string= old-text
-			 (buffer-substring (line-beginning-position) (line-end-position)))
-	  (signal 'wgrep-error "Buffer was changed after grep."))
-	(delete-region (line-beginning-position) (line-end-position))
-	(forward-line 0)
-	(insert new-text)
-	;; hilight the changed line
-	(wgrep-put-color-file)))))
+        (widen)
+        (wgrep-goto-line line)
+        ;;FIXME simply do this?
+        (when (and (= line 1) 
+                   buffer-file-coding-system
+                   (coding-system-get buffer-file-coding-system :bom))
+          (setq old-text (wgrep-string-replace-bom old-text buffer-file-coding-system))
+          (setq new-text (wgrep-string-replace-bom new-text buffer-file-coding-system)))
+        (unless (string= old-text
+                         (buffer-substring (line-beginning-position) (line-end-position)))
+          (signal 'wgrep-error "Buffer was changed after grep."))
+        (delete-region (line-beginning-position) (line-end-position))
+        (forward-line 0)
+        (insert new-text)
+        ;; hilight the changed line
+        (wgrep-put-color-file)))))
 
 ;;Hack function
 (defun wgrep-string-replace-bom (string cs)
   (let ((regexp (car (rassq (coding-system-base cs) auto-coding-regexp-alist)))
-	str)
+        str)
     ;;FIXME use find-operation-coding-system?
     (if (and regexp 
-	     (setq str (encode-coding-string string (terminal-coding-system)))
-	     (string-match regexp str))
-	(substring str (match-end 0))
+             (setq str (encode-coding-string string (terminal-coding-system)))
+             (string-match regexp str))
+        (substring str (match-end 0))
       string)))
 
 (defun wgrep-put-color-file ()
   "*Highlight the changed line of the file"
   (let ((ov (wgrep-make-overlay
-	     (line-beginning-position)
-	     (line-end-position))))
+             (line-beginning-position)
+             (line-end-position))))
     (overlay-put ov 'face 'wgrep-file-face)
     (overlay-put ov 'priority 0)
     (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)
@@ -355,32 +361,32 @@
     (save-match-data
       (forward-line 0)
       (let ((inhibit-it nil)
-	    header value origin ovs ov)
-	(when (looking-at wgrep-line-file-regexp)
-	  ;; check file name point or not
-	  (setq inhibit-it (> (match-end 0) beg))
-	  (setq header (match-string-no-properties 0))
-	  (setq value (buffer-substring-no-properties 
-		       (match-end 0) (line-end-position)))
-	  (unless inhibit-it
-	    (setq ovs (overlays-in (line-beginning-position) (line-end-position)))
-	    (while ovs
-	      (when (overlay-get (car ovs) 'wgrep-changed)
-		(when (string= (overlay-get (car ovs) 'wgrep-original-value) value)
-		  (setq wgrep-overlays (remove (car ovs) wgrep-overlays))
-		  (delete-overlay (car ovs)))
-		(setq inhibit-it t))
-	      (setq ovs (cdr ovs))))
-	  (unless inhibit-it
-	    (setq origin (wgrep-get-original-value header))
-	    (setq ov (wgrep-make-overlay
-		      (line-beginning-position)
-		      (line-end-position)))
-	    (overlay-put ov 'wgrep-changed t)
-	    (overlay-put ov 'face 'wgrep-face)
-	    (overlay-put ov 'priority 0)
-	    (overlay-put ov 'wgrep-original-value origin)
-	    (setq wgrep-overlays (cons ov wgrep-overlays))))))))
+            header value origin ovs ov)
+        (when (looking-at wgrep-line-file-regexp)
+          ;; check file name point or not
+          (setq inhibit-it (> (match-end 0) beg))
+          (setq header (match-string-no-properties 0))
+          (setq value (buffer-substring-no-properties 
+                       (match-end 0) (line-end-position)))
+          (unless inhibit-it
+            (setq ovs (overlays-in (line-beginning-position) (line-end-position)))
+            (while ovs
+              (when (overlay-get (car ovs) 'wgrep-changed)
+                (when (string= (overlay-get (car ovs) 'wgrep-original-value) value)
+                  (setq wgrep-overlays (remove (car ovs) wgrep-overlays))
+                  (delete-overlay (car ovs)))
+                (setq inhibit-it t))
+              (setq ovs (cdr ovs))))
+          (unless inhibit-it
+            (setq origin (wgrep-get-original-value header))
+            (setq ov (wgrep-make-overlay
+                      (line-beginning-position)
+                      (line-end-position)))
+            (overlay-put ov 'wgrep-changed t)
+            (overlay-put ov 'face 'wgrep-face)
+            (overlay-put ov 'priority 0)
+            (overlay-put ov 'wgrep-original-value origin)
+            (setq wgrep-overlays (cons ov wgrep-overlays))))))))
 
 (defun wgrep-to-grep-mode ()
   (remove-hook 'after-change-functions 'wgrep-after-change-function t)
@@ -392,28 +398,28 @@
 (defun wgrep-changed-overlay-action (ov)
   (let (local-buf info)
     (if (eq (overlay-start ov) (overlay-end ov))
-	;; ignore removed line or removed overlay
-	t
+        ;; ignore removed line or removed overlay
+        t
       (goto-char (overlay-start ov))
       (cond
        ((null (setq info (wgrep-get-line-info)))
-	;; ignore non grep result line.
-	t)
+        ;; ignore non grep result line.
+        t)
        (t
-	(let ((file (nth 0 info))
-	      (result (nth 3 info)))
-	  (condition-case err
-	      (progn
-		(wgrep-apply-to-buffer (wgrep-get-file-buffer file) info
-				       (overlay-get ov 'wgrep-original-value))
-		(wgrep-put-done-face result)
-		t)
-	    (wgrep-error
-	     (wgrep-put-reject-face result (cdr err))
-	     nil)
-	    (error 
-	     (wgrep-put-reject-face result (prin1-to-string err))
-	     nil))))))))
+        (let ((file (nth 0 info))
+              (result (nth 3 info)))
+          (condition-case err
+              (progn
+                (wgrep-apply-to-buffer (wgrep-get-file-buffer file) info
+                                       (overlay-get ov 'wgrep-original-value))
+                (wgrep-put-done-face result)
+                t)
+            (wgrep-error
+             (wgrep-put-reject-face result (cdr err))
+             nil)
+            (error 
+             (wgrep-put-reject-face result (prin1-to-string err))
+             nil))))))))
 
 (defun wgrep-finish-edit ()
   "Apply changed text to file buffers."
@@ -421,35 +427,35 @@
   (let ((count 0))
     (save-excursion
       (let ((not-yet (copy-seq wgrep-overlays)))
-	(while wgrep-overlays
-	  (let ((ov (car wgrep-overlays)))
-	    (setq wgrep-overlays (cdr wgrep-overlays))
-	    (when (wgrep-changed-overlay-action ov)
-	      (delete-overlay ov)
-	      (setq not-yet (delq ov not-yet))
-	      (incf count))))
-	;; restore overlays
-	(setq wgrep-overlays not-yet)))
+        (while wgrep-overlays
+          (let ((ov (car wgrep-overlays)))
+            (setq wgrep-overlays (cdr wgrep-overlays))
+            (when (wgrep-changed-overlay-action ov)
+              (delete-overlay ov)
+              (setq not-yet (delq ov not-yet))
+              (incf count))))
+        ;; restore overlays
+        (setq wgrep-overlays not-yet)))
     (wgrep-cleanup-temp-buffer)
     (wgrep-to-grep-mode)
     (let ((msg (format "(%d changed)" count)))
       (cond
        ((null wgrep-overlays)
-	(if (= count 0)
-	    (message "(No changes to be performed)")
-	  (message "Successfully finished. %s" msg)))
+        (if (= count 0)
+            (message "(No changes to be performed)")
+          (message "Successfully finished. %s" msg)))
        ((= (length wgrep-overlays) 1)
-	(message "There is unapplied change. %s" msg))
+        (message "There is unapplied change. %s" msg))
        (t
-	(message "There are %d unapplied changes. %s" 
-		 (length wgrep-overlays) msg))))))
+        (message "There are %d unapplied changes. %s" 
+                 (length wgrep-overlays) msg))))))
 
 (defun wgrep-exit ()
   "Return to `grep-mode'"
   (interactive)
   (if (and (buffer-modified-p)
-	   (y-or-n-p (format "Buffer %s modified; save changes? "
-			     (current-buffer))))
+           (y-or-n-p (format "Buffer %s modified; save changes? "
+                             (current-buffer))))
       (wgrep-finish-edit)
     (wgrep-abort-changes)))
 
@@ -463,17 +469,13 @@
 (defun wgrep-remove-change (beg end)
   "Remove color the region between BEG and END."
   (interactive "r")
-  (let ((ovs (overlays-in beg end)))
-    (while ovs
-      (when (overlay-get (car ovs) 'wgrep)
-	(delete-overlay (car ovs)))
-      (setq ovs (cdr ovs))))
+  (wgrep-cleanup-overlays beg end)
   (setq mark-active nil))
 
 (defun wgrep-remove-all-change ()
   "Remove color whole buffer."
   (interactive)
-  (wgrep-remove-change (point-min) (point-max)))
+  (wgrep-cleanup-overlays (point-min) (point-max)))
 
 (defun wgrep-to-wgrep-mode ()
   "Prepare editing buffer."
@@ -493,7 +495,7 @@
   (set-buffer-modified-p wgrep-overlays) ;; restore modified status
   (setq buffer-undo-list nil)
   (message "%s" (substitute-command-keys
-		 "Press \\[wgrep-finish-edit] when finished \
+                 "Press \\[wgrep-finish-edit] when finished \
 or \\[wgrep-abort-changes] to abort changes.")))
 
 (defun wgrep-toggle-readonly-area ()
@@ -512,14 +514,14 @@ Example:
 "
   (interactive)
   (let ((modified (buffer-modified-p))
-	after-change-functions)
+        after-change-functions)
     (when (wgrep-buffer-huge-p)
       (unless (y-or-n-p "Buffer is too large. Ready to freeze several minutes? ")
-	(error "Buffer is too large.")))
+        (error "Buffer is too large.")))
     (wgrep-set-readonly-area (not wgrep-readonly-state))
     (set-buffer-modified-p modified)
     (if wgrep-readonly-state
-	(message "Now **disable** to remove whole line.")
+        (message "Now **disable** to remove whole line.")
       (message "Now enable to remove whole line."))))
 
 (defun wgrep-disable-filter ()
@@ -553,11 +555,11 @@ When huge *grep* buffer, freezing several minutes.
     (error "Not a grep buffer"))
   (let ((huge (wgrep-buffer-huge-p)))
     (when (or (not huge)
-	      (y-or-n-p "Buffer is too large. Ready to freeze several minutes? "))
+              (y-or-n-p "Buffer is too large. Ready to freeze several minutes? "))
       (setq huge nil)
       (save-excursion
-	(goto-char (point-max))
-	(wgrep-grep-filter)))
+        (goto-char (point-max))
+        (wgrep-grep-filter)))
     (wgrep-finish-function (current-buffer) nil)
     (when huge
       (setq wgrep-readonly-state nil))
@@ -574,11 +576,11 @@ When huge *grep* buffer, freezing several minutes.
     (mapc
      (lambda (b)
        (with-current-buffer b
-	 (when (and (local-variable-p 'wgrep-file-overlays)
-		    wgrep-file-overlays
-		    (buffer-modified-p))
-	   (basic-save-buffer)
-	   (incf count))))
+         (when (and (local-variable-p 'wgrep-file-overlays)
+                    wgrep-file-overlays
+                    (buffer-modified-p))
+           (basic-save-buffer)
+           (incf count))))
      (buffer-list))
     (cond
      ((= count 0)
@@ -593,33 +595,33 @@ When huge *grep* buffer, freezing several minutes.
     (wgrep-goto-first-found)
     (let (after-change-functions buffer-read-only)
       (while (not (eobp))
-	(cond
-	 ((looking-at wgrep-line-file-regexp)
-	  (let ((filename (match-string 1))
-		(line (string-to-number (match-string 3))))
-	    ;; delete backward and forward following options.
-	    ;; -A (--after-context) -B  (--before-context) -C (--context)
-	    (save-excursion
-	      (wgrep-prepare-context filename line nil))
-	    (wgrep-prepare-context filename line t)
-	    (forward-line -1)))
-	 ((looking-at "^--$")
-	  (wgrep-delete-region
-	   (line-beginning-position)
-	   (save-excursion (forward-line 1) (point)))
-	  (forward-line -1)))
-	(forward-line 1)))))
+        (cond
+         ((looking-at wgrep-line-file-regexp)
+          (let ((filename (match-string 1))
+                (line (string-to-number (match-string 3))))
+            ;; delete backward and forward following options.
+            ;; -A (--after-context) -B  (--before-context) -C (--context)
+            (save-excursion
+              (wgrep-prepare-context filename line nil))
+            (wgrep-prepare-context filename line t)
+            (forward-line -1)))
+         ((looking-at "^--$")
+          (wgrep-delete-region
+           (line-beginning-position)
+           (save-excursion (forward-line 1) (point)))
+          (forward-line -1)))
+        (forward-line 1)))))
 
 (defun wgrep-goto-first-found ()
   (goto-char (point-min))
   (while (and (not (eobp))
-	      (not (get-text-property (point) 'face)))
+              (not (get-text-property (point) 'face)))
     (forward-line 1)))
 
 (defun wgrep-goto-end-of-found ()
   (goto-char (point-max))
   (while (and (not (bobp))
-	      (not (get-text-property (point) 'face)))
+              (not (get-text-property (point) 'face)))
     (forward-line -1))
   (forward-line 1))
 
@@ -629,21 +631,21 @@ When huge *grep* buffer, freezing several minutes.
 
 (defun wgrep-prepare-context (filename line forward)
   (let ((diff (if forward 1 -1))
-	next line-head)
+        next line-head)
     (setq next (+ diff line))
     (forward-line diff)
     (let ((inhibit-read-only t))
       (while (looking-at (format "^%s\\(-\\)%d\\(-\\)" filename next))
-	(setq line-head (format "%s:%d:" filename next))
-	(wgrep-set-readonly-property 0 (length line-head) line-head)
-	(replace-match line-head nil nil nil 0)
-	;; -A -B -C output may be misunderstood and set read-only.
-	;; (ex: filename-20-2010/01/01 23:59:99)
-	;; To obey the properties order. '(read-only face) not works.
-	(remove-text-properties (point) (line-end-position) 
-				'(face read-only) (current-buffer))
-	(forward-line diff)
-	(setq next (+ diff next))))))
+        (setq line-head (format "%s:%d:" filename next))
+        (wgrep-set-readonly-property 0 (length line-head) line-head)
+        (replace-match line-head nil nil nil 0)
+        ;; -A -B -C output may be misunderstood and set read-only.
+        ;; (ex: filename-20-2010/01/01 23:59:99)
+        ;; To obey the properties order. '(read-only face) not works.
+        (remove-text-properties (point) (line-end-position) 
+                                '(face read-only) (current-buffer))
+        (forward-line diff)
+        (setq next (+ diff next))))))
 
 (defun wgrep-delete-region (min max)
   (let ((inhibit-read-only t))
@@ -653,18 +655,18 @@ When huge *grep* buffer, freezing several minutes.
 (defun wgrep-process-exited-p ()
   (let ((proc (get-buffer-process (current-buffer))))
     (or (null proc)
-	(eq (process-status proc) 'exit))))
+        (eq (process-status proc) 'exit))))
 
 (defun wgrep-grep-filter ()
   "Set text read-only backward."
   (save-excursion
     (let ((inhibit-read-only t)
-	  (regexp (format "\\(?:%s\\|\n\\)" wgrep-line-file-regexp)))
+          (regexp (format "\\(?:%s\\|\n\\)" wgrep-line-file-regexp)))
       ;; backward to previous read-only
       (while (and (re-search-backward regexp nil t)
-		  (not (get-text-property (point) 'read-only)))
-	(wgrep-set-readonly-property (match-beginning 0)
-				     (match-end 0))))))
+                  (not (get-text-property (point) 'read-only)))
+        (wgrep-set-readonly-property (match-beginning 0)
+                                     (match-end 0))))))
 
 (defun wgrep-set-readonly-property (start end &optional object)
   (set-text-properties start end '(read-only t) object)
@@ -675,34 +677,41 @@ When huge *grep* buffer, freezing several minutes.
 
 (defun wgrep-finish-function (buffer msg)
   (when (with-current-buffer buffer
-	  (wgrep-process-exited-p))
+          (wgrep-process-exited-p))
     (save-excursion
       (let ((inhibit-read-only t)
-	    buffer-read-only
-	    beg end)
-	;; Grep result header
-	(setq beg (point-min))
-	(wgrep-goto-first-found)
-	(setq end (point))
-	(put-text-property beg end 'read-only t)
-	;; Grep result footer
-	(wgrep-goto-end-of-found)
-	(setq beg (point))
-	(setq end (point-max))
-	(when beg
-	  (put-text-property beg end 'read-only t))))
+            buffer-read-only
+            beg end)
+        ;; Grep result header
+        (setq beg (point-min))
+        (wgrep-goto-first-found)
+        (setq end (point))
+        (put-text-property beg end 'read-only t)
+        ;; Grep result footer
+        (wgrep-goto-end-of-found)
+        (setq beg (point))
+        (setq end (point-max))
+        (when beg
+          (put-text-property beg end 'read-only t))))
     (add-hook 'post-command-hook 'wgrep-maybe-echo-error-at-point nil t)
     (setq wgrep-readonly-state t)))
 
+(defun wgrep-cleanup-overlays (beg end)
+  (let ((ovs (overlays-in beg end)))
+    (while ovs
+      (when (overlay-get (car ovs) 'wgrep)
+        (delete-overlay (car ovs)))
+      (setq ovs (cdr ovs)))))
+
 (defun wgrep-make-overlay (beg end)
-  (let ((o (make-overlay beg end)))
+  (let ((o (make-overlay beg end nil nil t)))
     (overlay-put o 'wgrep t)
     o))
 
 (defun wgrep-clone-to-temp-buffer ()
   (wgrep-cleanup-temp-buffer)
   (let ((grepbuf (current-buffer))
-	(tmpbuf (generate-new-buffer " *wgrep temp* ")))
+        (tmpbuf (generate-new-buffer " *wgrep temp* ")))
     (setq wgrep-each-other-buffer tmpbuf)
     (add-hook 'kill-buffer-hook 'wgrep-cleanup-temp-buffer nil t)
     (append-to-buffer tmpbuf (point-min) (point-max))
@@ -713,22 +722,22 @@ When huge *grep* buffer, freezing several minutes.
 (defun wgrep-restore-from-temp-buffer ()
   (cond
    ((and wgrep-each-other-buffer
-	 (buffer-live-p wgrep-each-other-buffer))
+         (buffer-live-p wgrep-each-other-buffer))
     (let ((grepbuf (current-buffer))
-	  (tmpbuf wgrep-each-other-buffer)
-	  (savedh (wgrep-current-header))
-	  (savedc (current-column))
-	  (savedp (point))
-	  (inhibit-read-only t)
-	  buffer-read-only)
+          (tmpbuf wgrep-each-other-buffer)
+          (savedh (wgrep-current-header))
+          (savedc (current-column))
+          (savedp (point))
+          (inhibit-read-only t)
+          buffer-read-only)
       (erase-buffer)
       (with-current-buffer tmpbuf
-	(append-to-buffer grepbuf (point-min) (point-max)))
+        (append-to-buffer grepbuf (point-min) (point-max)))
       (goto-char (point-min))
       (or (and savedh
-	       (re-search-forward (concat "^" (regexp-quote savedh)) nil t)
-	       (move-to-column savedc))
-	  (goto-char (min (point-max) savedp)))
+               (re-search-forward (concat "^" (regexp-quote savedh)) nil t)
+               (move-to-column savedc))
+          (goto-char (min (point-max) savedp)))
       (wgrep-cleanup-temp-buffer)
       (setq wgrep-overlays nil)))
    (t
@@ -741,9 +750,9 @@ When huge *grep* buffer, freezing several minutes.
     (let ((grep-buffer (current-buffer)))
       (mapc
        (lambda (buf)
-	 (with-current-buffer buf
-	   (when (eq grep-buffer wgrep-each-other-buffer)
-	     (kill-buffer buf))))
+         (with-current-buffer buf
+           (when (eq grep-buffer wgrep-each-other-buffer)
+             (kill-buffer buf))))
        (buffer-list)))
     (setq wgrep-each-other-buffer nil)))
 
@@ -759,11 +768,11 @@ When huge *grep* buffer, freezing several minutes.
 
 (defun wgrep-get-original-value (header)
   (when (and wgrep-each-other-buffer
-	     (buffer-live-p wgrep-each-other-buffer))
+             (buffer-live-p wgrep-each-other-buffer))
     (with-current-buffer wgrep-each-other-buffer
       (goto-char (point-min))
       (when (re-search-forward (concat "^" (regexp-quote header)) nil t)
-	(buffer-substring-no-properties (point) (line-end-position))))))
+        (buffer-substring-no-properties (point) (line-end-position))))))
 
 (provide 'wgrep)
 

@@ -1,10 +1,11 @@
-;;; wgrep --- Writable grep buffer and apply the changes to files
+;;; wgrep.el --- Writable grep buffer and apply the changes to files
 
 ;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; URL: http://www.emacswiki.org/emacs/download/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
+;; Version: 1.0.0
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -41,12 +42,14 @@
 
 ;; C-c C-e : Apply the highlighting changes to file buffers.
 ;; C-c C-u : All changes are unmarked and ignored.
+;; C-c C-d : Delete current line include new line.
+;;           Command result immediately reflect to file buffer.
 ;; C-c C-r : Remove the highlight in the region (The Changes doesn't
-;;      apply to files. Of course, if you type C-c C-e, the remained
-;;      highlight changes are applied to files.)
-;; C-c C-p Toggle read-only area.
-;; C-c C-k Discard all changes and exit.
-;; C-x C-q Exit wgrep mode.
+;;           apply to files. Of course, if you type C-c C-e, the remained
+;;           highlight changes are applied to files.)
+;; C-c C-p : Toggle read-only area.
+;; C-c C-k : Discard all changes and exit.
+;; C-x C-q : Exit wgrep mode.
 
 ;; To save all buffers that wgrep changed by
 ;;   M-x wgrep-save-all-buffers
@@ -64,11 +67,8 @@
 ;; * Bind to local variables. (grep-a-lot.el works well)
 ;; * After save buffer, colored face will be removed.
 ;; * Change face easy to see.
-;; * Reinforce check error.
-
-;;; TODO:
-
-;; * can remove whole line include newline. (In file buffer)
+;; * Reinforce checking error.
+;; * Support removing whole line include new-line.
 
 ;;; Code:
 
@@ -168,6 +168,7 @@
         (let ((map (make-sparse-keymap)))
 
           (define-key map "\C-c\C-c" 'wgrep-finish-edit)
+          (define-key map "\C-c\C-d" 'wgrep-flush-current-line)
           (define-key map "\C-c\C-e" 'wgrep-finish-edit)
           (define-key map "\C-c\C-p" 'wgrep-toggle-readonly-area)
           (define-key map "\C-c\C-r" 'wgrep-remove-change)
@@ -218,12 +219,12 @@
    (t
     (wgrep-put-change-face beg end))))
 
-(defun wgrep-get-line-info ()
+(defun wgrep-get-line-info (&optional flush)
   (forward-line 0)
   (when (looking-at (concat wgrep-line-file-regexp "\\([^\n]*$\\)"))
     (let ((name (match-string-no-properties 1))
           (line (match-string-no-properties 3))
-          (text (match-string-no-properties 4))
+          (text (and (not flush) (match-string-no-properties 4)))
           (start (match-beginning 4))
           ov)
       (setq ov
@@ -281,15 +282,23 @@
                    buffer-file-coding-system
                    (coding-system-get buffer-file-coding-system :bom))
           (setq old-text (wgrep-string-replace-bom old-text buffer-file-coding-system))
-          (setq new-text (wgrep-string-replace-bom new-text buffer-file-coding-system)))
+          (when new-text
+            (setq new-text (wgrep-string-replace-bom new-text buffer-file-coding-system))))
         (unless (string= old-text
                          (buffer-substring (line-beginning-position) (line-end-position)))
           (signal 'wgrep-error "Buffer was changed after grep."))
-        (delete-region (line-beginning-position) (line-end-position))
-        (forward-line 0)
-        (insert new-text)
-        ;; hilight the changed line
-        (wgrep-put-color-file)))))
+        (cond
+         (new-text
+          (wgrep-replace-to-new-line new-text))
+         (t
+          ;; new-text nil means flush whole line.
+          (wgrep-flush-pop-deleting-line)))))))
+
+(defun wgrep-replace-to-new-line (new-text)
+  (delete-region (line-beginning-position) (line-end-position))
+  (insert new-text)
+  ;; hilight the changed line
+  (wgrep-put-color-file))
 
 ;;Hack function
 (defun wgrep-string-replace-bom (string cs)
@@ -371,7 +380,7 @@
   (setq buffer-read-only t))
 
 (defun wgrep-changed-overlay-action (ov)
-  (let (local-buf info)
+  (let (info)
     (if (eq (overlay-start ov) (overlay-end ov))
         ;; ignore removed line or removed overlay
         t
@@ -382,18 +391,18 @@
         t)
        (t
         (let ((file (nth 0 info))
-              (result (nth 3 info)))
+              (result-ov (nth 3 info)))
           (condition-case err
               (progn
                 (wgrep-apply-to-buffer (wgrep-get-file-buffer file) info
                                        (overlay-get ov 'wgrep-original-value))
-                (wgrep-put-done-face result)
+                (wgrep-put-done-face result-ov)
                 t)
             (wgrep-error
-             (wgrep-put-reject-face result (cdr err))
+             (wgrep-put-reject-face result-ov (cdr err))
              nil)
             (error 
-             (wgrep-put-reject-face result (prin1-to-string err))
+             (wgrep-put-reject-face result-ov (prin1-to-string err))
              nil))))))))
 
 (defun wgrep-finish-edit ()
@@ -522,6 +531,53 @@ or \\[wgrep-abort-changes] to abort changes.")))
      (t
       (message "%d Buffers are saved." count)))))
 
+(defun wgrep-flush-current-line ()
+  "Flush current line and file buffer. Undo is disabled in this command.
+This command result immediately reflect to file buffer, although not saved.
+"
+  (interactive)
+  (save-excursion
+    (let ((inhibit-read-only t))
+      (forward-line 0)
+      (unless (looking-at wgrep-line-file-regexp)
+        (error "Not a grep result"))
+      (let* ((header (match-string-no-properties 0))
+             (file (match-string-no-properties 1))
+             (line (string-to-number (match-string 3)))
+             (origin (wgrep-get-original-value header))
+             (info (wgrep-get-line-info t))
+             (buffer (wgrep-get-file-buffer file)))
+        (let ((inhibit-quit t))
+          (when (wgrep-flush-apply-to-buffer buffer info origin)
+            (wgrep-cleanup-overlays (line-beginning-position) (line-end-position))
+            ;; disable undo and change *grep* buffer.
+            (let ((buffer-undo-list t))
+              (wgrep-delete-whole-line)
+              (wgrep-after-delete-line file line))
+            (with-current-buffer wgrep-each-other-buffer
+              (let ((inhibit-read-only t))
+                (wgrep-after-delete-line file line)))))))))
+
+(defun wgrep-after-delete-line (filename delete-line)
+  (save-excursion
+    (wgrep-goto-first-found)
+    (let ((regexp (format "^%s\\(?::\\)\\([0-9]+\\)\\(?::\\)" (regexp-quote filename))))
+      (while (not (eobp))
+        (when (looking-at regexp)
+          (let ((line (string-to-number (match-string 1)))
+                (read-only (get-text-property (point) 'read-only)))
+            (cond
+             ((= line delete-line)
+              ;; for cloned buffer (flush same line number)
+              (wgrep-delete-whole-line)
+              (forward-line -1))
+             ((> line delete-line)
+              ;; down line number
+              (let ((line-head (format "%s:%d:" filename (1- line))))
+                (wgrep-set-readonly-property 0 (length line-head) read-only line-head)
+                (replace-match line-head nil nil nil 0))))))
+        (forward-line 1)))))
+
 (defun wgrep-prepare-context ()
   (wgrep-goto-first-found)
   (while (not (eobp))
@@ -536,11 +592,13 @@ or \\[wgrep-abort-changes] to abort changes.")))
         (wgrep-prepare-context-while filename line t)
         (forward-line -1)))
      ((looking-at "^--$")
-      (wgrep-delete-region
-       (line-beginning-position)
-       (save-excursion (forward-line 1) (point)))
+      (wgrep-delete-whole-line)
       (forward-line -1)))
     (forward-line 1)))
+
+(defun wgrep-delete-whole-line ()
+  (wgrep-delete-region 
+   (line-beginning-position) (line-beginning-position 2)))
 
 (defun wgrep-goto-first-found ()
   (goto-char (point-min))
@@ -677,6 +735,27 @@ or \\[wgrep-abort-changes] to abort changes.")))
       (goto-char (point-min))
       (when (re-search-forward (concat "^" (regexp-quote header)) nil t)
         (buffer-substring-no-properties (point) (line-end-position))))))
+
+(defun wgrep-flush-pop-deleting-line ()
+  (save-window-excursion
+    (set-window-buffer (selected-window) (current-buffer))
+    (wgrep-put-color-file)
+    (sit-for 0.3)
+    (wgrep-delete-whole-line)
+    (sit-for 0.3)))
+
+(defun wgrep-flush-apply-to-buffer (buffer info origin)
+  (let ((ov (nth 3 info)))
+    (condition-case err
+        (progn
+          (wgrep-apply-to-buffer buffer info origin)
+          t)
+      (wgrep-error
+       (wgrep-put-reject-face ov (cdr err))
+       nil)
+      (error 
+       (wgrep-put-reject-face ov (prin1-to-string err))
+       nil))))
 
 (provide 'wgrep)
 

@@ -1,6 +1,6 @@
 ;;; wgrep.el --- Writable grep buffer and apply the changes to files
 
-;; Author: Hayashi Masahiro <mhayashi1120@gmail.com>
+;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; URL: http://www.emacswiki.org/emacs/download/wgrep.el

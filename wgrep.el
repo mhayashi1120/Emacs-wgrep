@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 1.0.0
+;; Version: 1.0.1
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -476,8 +476,10 @@ Example:
 ----------------------------------------------
 "
   (interactive)
-  (let ((modified (buffer-modified-p)))
-    (wgrep-set-readonly-area (not wgrep-readonly-state))
+  (let ((modified (buffer-modified-p))
+        (read-only (not wgrep-readonly-state)))
+    (wgrep-set-readonly-area read-only)
+    (wgrep-set-header/footer-read-only read-only)
     (set-buffer-modified-p modified)
     (if wgrep-readonly-state
         (message "Now **disable** to remove whole line.")
@@ -652,13 +654,28 @@ This command result immediately reflect to file buffer, although not saved.
       (wgrep-goto-first-found)
       (setq end (point))
       (put-text-property beg end 'read-only t)
+      (put-text-property beg end 'wgrep-header t)
       ;; Set read-only grep result footer
       (wgrep-goto-end-of-found)
       (setq beg (point))
       (setq end (point-max))
       (when beg
-        (put-text-property beg end 'read-only t))
+        (put-text-property beg end 'read-only t)
+        (put-text-property beg end 'wgrep-footer t))
       (wgrep-prepare-context))))
+
+(defun wgrep-set-header/footer-read-only (state)
+  (let ((inhibit-read-only t)
+        after-change-functions
+        beg end)
+    ;; header
+    (setq end (next-single-property-change (point-min) 'wgrep-header))
+    (when end
+      (put-text-property (point-min) end 'read-only state))
+    ;; footer
+    (setq beg (next-single-property-change (point-min) 'wgrep-footer))
+    (when beg
+      (put-text-property beg (point-max) 'read-only state))))
 
 (defun wgrep-cleanup-overlays (beg end)
   (let ((ovs (overlays-in beg end)))

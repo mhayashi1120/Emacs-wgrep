@@ -87,7 +87,7 @@
 
 (defcustom wgrep-enable-key "\C-c\C-p"
   "*Key to enable `wgrep-mode'."
-  :type 'string  
+  :type 'string
   :group 'wgrep)
 
 (defvar wgrep-setup-hook nil
@@ -206,7 +206,7 @@
     (save-excursion
       (wgrep-goto-first-found)
       (while (re-search-forward regexp nil t)
-        (wgrep-set-readonly-property 
+        (wgrep-set-readonly-property
          (match-beginning 0) (match-end 0) state)))
     (setq wgrep-readonly-state state)))
 
@@ -229,7 +229,7 @@
       (setq ov
             (or
              ;; get existing overlay
-             (find-if 
+             (find-if
               (lambda (o)
                 (memq (overlay-get o 'face) '(wgrep-reject-face wgrep-done-face)))
               (overlays-in start (line-end-position)))
@@ -277,7 +277,7 @@
         (widen)
         (wgrep-goto-line line)
         ;;FIXME simply do this?
-        (when (and (= line 1) 
+        (when (and (= line 1)
                    buffer-file-coding-system
                    (coding-system-get buffer-file-coding-system :bom))
           (setq old-text (wgrep-string-replace-bom old-text buffer-file-coding-system))
@@ -304,12 +304,12 @@
   (let ((regexp (car (rassq (coding-system-base cs) auto-coding-regexp-alist)))
         ;; FIXME: `find-operation-coding-system' is not exactly correct.
         ;;        However almost case is ok like this bom function.
-        ;;        ex: (let ((default-process-coding-system 'some-coding)) 
+        ;;        ex: (let ((default-process-coding-system 'some-coding))
         ;;               (call-interactively 'grep))
         (grep-cs (or (find-operation-coding-system 'call-process grep-program)
                      (terminal-coding-system)))
         str)
-    (if (and regexp 
+    (if (and regexp
              (setq str (encode-coding-string string grep-cs))
              (string-match regexp str))
         (substring str (match-end 0))
@@ -347,7 +347,7 @@
           ;; check file name point or not
           (setq inhibit-it (> (match-end 0) beg))
           (setq header (match-string-no-properties 0))
-          (setq value (buffer-substring-no-properties 
+          (setq value (buffer-substring-no-properties
                        (match-end 0) (line-end-position)))
           (unless inhibit-it
             (setq ovs (overlays-in (line-beginning-position) (line-end-position)))
@@ -400,7 +400,7 @@
             (wgrep-error
              (wgrep-put-reject-face result-ov (cdr err))
              nil)
-            (error 
+            (error
              (wgrep-put-reject-face result-ov (prin1-to-string err))
              nil))))))))
 
@@ -430,7 +430,7 @@
        ((= (length wgrep-overlays) 1)
         (message "There is an unapplied change. %s" msg))
        (t
-        (message "There are %d unapplied changes. %s" 
+        (message "There are %d unapplied changes. %s"
                  (length wgrep-overlays) msg))))))
 
 (defun wgrep-exit ()
@@ -466,7 +466,7 @@
 
 See the following example: you obviously don't want to edit the first line.
 If grep matches a lot of lines, it's hard to edit the grep buffer.
-After toggling to editable, you can call 
+After toggling to editable, you can call
 `delete-matching-lines', `delete-non-matching-lines'.
 
 Example:
@@ -486,7 +486,7 @@ Example:
       (message "Removing the whole line is now enabled."))))
 
 (defun wgrep-change-to-wgrep-mode ()
-  "Change to wgrep mode. 
+  "Change to wgrep mode.
 
 When the *grep* buffer is huge, this might freeze your Emacs for several minutes.
 "
@@ -598,7 +598,7 @@ This command immediately changes the file buffer, although the buffer is not sav
     (forward-line 1)))
 
 (defun wgrep-delete-whole-line ()
-  (wgrep-delete-region 
+  (wgrep-delete-region
    (line-beginning-position) (line-beginning-position 2)))
 
 (defun wgrep-goto-first-found ()
@@ -769,7 +769,7 @@ This command immediately changes the file buffer, although the buffer is not sav
       (wgrep-error
        (wgrep-put-reject-face ov (cdr err))
        nil)
-      (error 
+      (error
        (wgrep-put-reject-face ov (prin1-to-string err))
        nil))))
 

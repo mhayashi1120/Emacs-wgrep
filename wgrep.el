@@ -256,6 +256,13 @@
              buffer-read-only)
     (signal 'wgrep-error (format "Buffer \"%s\" is read-only." (buffer-name)))))
 
+(defun wgrep-display-physical-data ()
+  (cond
+   ((derived-mode-p 'image-mode)
+    (when (image-get-display-property)
+      (image-mode-as-text)))
+   (t nil)))
+
 ;; not consider other edit. (ex: Undo or self-insert-command)
 (defun wgrep-after-save-hook ()
   (remove-hook 'after-save-hook 'wgrep-after-save-hook t)
@@ -273,6 +280,7 @@
           (result (nth 3 info))
           (inhibit-read-only wgrep-change-readonly-file))
       (wgrep-check-buffer)
+      (wgrep-display-physical-data)
       (save-restriction
         (widen)
         (wgrep-goto-line line)

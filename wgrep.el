@@ -23,7 +23,7 @@
 
 ;;; Commentary:
 
-;; wgrep provides to edit grep buffer and to apply the changes to
+;; wgrep allows you to edit a grep buffer and apply those changes to
 ;; the file buffer.
 
 ;;; Install:
@@ -35,27 +35,27 @@
 
 ;;; Usage:
 
-;; You can edit the text on *grep* buffer after type C-c C-p.
+;; You can edit the text in the *grep* buffer after typing C-c C-p.
 ;; After that the changed text is highlighted.
-;; Following keybind is defined.
+;; The following keybindings are defined:
 
-;; C-c C-e : Apply the highlighting changes to file buffers.
+;; C-c C-e : Apply the changes to file buffers.
 ;; C-c C-u : All changes are unmarked and ignored.
-;; C-c C-d : Delete current line include new line.
-;;           Command result immediately reflect to file buffer.
-;; C-c C-r : Remove the highlight in the region (The Changes doesn't
-;;           apply to files. Of course, if you type C-c C-e, the remained
-;;           highlight changes are applied to files.)
+;; C-c C-d : Delete current line (including newline).
+;;           This is immediately reflected in the file's buffer.
+;; C-c C-r : Remove the changes in the region (these changes are not
+;;           applied to the files. Of course, the remaining
+;;           changes can still be applied to the files.)
 ;; C-c C-p : Toggle read-only area.
 ;; C-c C-k : Discard all changes and exit.
 ;; C-x C-q : Exit wgrep mode.
 
-;; To save all buffers that wgrep changed by
+;; To save all buffers that wgrep changed, run
 ;;   M-x wgrep-save-all-buffers
 
 ;;; History:
 
-;; This program is forked version. Original version can be downloaded from
+;; This program is a forked version. the original version can be downloaded from
 ;; http://www.bookshelf.jp/elc/grep-edit.el
 
 ;; Following added implementations and differences.
@@ -81,7 +81,7 @@
   :group 'grep)
 
 (defcustom wgrep-change-readonly-file nil
-  "*Non-nil means to change read only files."
+  "*Non-nil means to change read-only files."
   :group 'wgrep
   :type 'boolean)
 
@@ -91,7 +91,7 @@
   :group 'wgrep)
 
 (defvar wgrep-setup-hook nil
-  "Hooks run when setup wgrep.")
+  "Hooks to run when setting up wgrep.")
 
 (defface wgrep-face
   '((((class color)
@@ -102,7 +102,7 @@
      (:background "ForestGreen" :weight bold :foreground "white"))
     (t
      ()))
-  "*Face used for the changed text on grep buffer."
+  "*Face used for the changed text in the grep buffer."
   :group 'wgrep)
 
 (defface wgrep-file-face
@@ -114,7 +114,7 @@
      (:background "ForestGreen" :weight bold :foreground "white"))
     (t
      ()))
-  "*Face used for the changed text on file buffer."
+  "*Face used for the changed text in the file buffer."
   :group 'wgrep)
 
 (defface wgrep-reject-face
@@ -126,7 +126,7 @@
      (:foreground "red" :weight bold))
     (t
      ()))
-  "*Face used for the line on grep buffer that can not apply to file."
+  "*Face used for the line in the grep buffer that can not be applied to a file."
   :group 'wgrep)
 
 (defface wgrep-done-face
@@ -138,7 +138,7 @@
      (:foreground "blue" :weight bold))
     (t
      ()))
-  "*Face used for the line on grep buffer that can apply to file."
+  "*Face used for the line in the grep buffer that can be applied to a file."
   :group 'wgrep)
 
 (defvar wgrep-overlays nil)
@@ -240,18 +240,18 @@
             ov))))
 
 (put 'wgrep-error 'error-conditions '(wgrep-error error))
-(put 'wgrep-error 'error-message "Applying error.")
+(put 'wgrep-error 'error-message "Error while applying changes.")
 
 (defun wgrep-get-file-buffer (file)
   (unless (file-exists-p file)
-    (signal 'wgrep-error "File is not exists."))
+    (signal 'wgrep-error "File does not exist."))
   (unless (file-writable-p file)
     (signal 'wgrep-error "File is not writable."))
   (or (get-file-buffer file)
       (find-file-noselect file)))
 
 (defun wgrep-check-buffer ()
-  "Check the file status. If it is possible to change file, return t"
+  "Check the file's status. If it is possible to change the file, return t"
   (when (and (not wgrep-change-readonly-file)
              buffer-read-only)
     (signal 'wgrep-error (format "Buffer \"%s\" is read-only." (buffer-name)))))
@@ -266,7 +266,7 @@
   (kill-local-variable 'wgrep-file-overlays))
 
 (defun wgrep-apply-to-buffer (buffer info old-text)
-  "*The changes on the grep buffer apply to the file"
+  "*The changes in the grep buffer are applied to the file"
   (with-current-buffer buffer
     (let ((line (nth 1 info))
           (new-text (nth 2 info))
@@ -316,7 +316,7 @@
       string)))
 
 (defun wgrep-put-color-file ()
-  "*Highlight the changed line of the file"
+  "*Highlight the changes in the file"
   (let ((ov (wgrep-make-overlay
              (line-beginning-position)
              (line-end-position))))
@@ -405,7 +405,7 @@
              nil))))))))
 
 (defun wgrep-finish-edit ()
-  "Apply changed text to file buffers."
+  "Apply changes to file buffers."
   (interactive)
   (let ((count 0))
     (save-excursion
@@ -428,7 +428,7 @@
             (message "(No changes to be performed)")
           (message "Successfully finished. %s" msg)))
        ((= (length wgrep-overlays) 1)
-        (message "There is unapplied change. %s" msg))
+        (message "There is an unapplied change. %s" msg))
        (t
         (message "There are %d unapplied changes. %s" 
                  (length wgrep-overlays) msg))))))
@@ -448,25 +448,25 @@
   (wgrep-cleanup-overlays (point-min) (point-max))
   (wgrep-restore-from-temp-buffer)
   (wgrep-to-grep-mode)
-  (message "Changes aborted"))
+  (message "Changes discarded"))
 
 (defun wgrep-remove-change (beg end)
-  "Remove color the region between BEG and END."
+  "Remove changes in the region between BEG and END."
   (interactive "r")
   (wgrep-cleanup-overlays beg end)
   (setq mark-active nil))
 
 (defun wgrep-remove-all-change ()
-  "Remove color whole buffer."
+  "Remove changes in the whole buffer."
   (interactive)
   (wgrep-cleanup-overlays (point-min) (point-max)))
 
 (defun wgrep-toggle-readonly-area ()
-  "Toggle read-only area to remove whole line.
+  "Toggle read-only area to remove a whole line.
 
-See the following example, you obviously don't want to edit first line.
-If grep hit a lot of line, hard to edit the buffer.
-After toggle to editable, you can call 
+See the following example: you obviously don't want to edit the first line.
+If grep matches a lot of lines, it's hard to edit the grep buffer.
+After toggling to editable, you can call 
 `delete-matching-lines', `delete-non-matching-lines'.
 
 Example:
@@ -482,13 +482,13 @@ Example:
     (wgrep-set-header/footer-read-only read-only)
     (set-buffer-modified-p modified)
     (if wgrep-readonly-state
-        (message "Now **disable** to remove whole line.")
-      (message "Now enable to remove whole line."))))
+        (message "Removing the whole line is now disabled.")
+      (message "Removing the whole line is now enabled."))))
 
 (defun wgrep-change-to-wgrep-mode ()
   "Change to wgrep mode. 
 
-When huge *grep* buffer, freezing several minutes.
+When the *grep* buffer is huge, this might freeze your Emacs for several minutes.
 "
   (interactive)
   (unless (eq major-mode 'grep-mode)
@@ -512,7 +512,7 @@ When huge *grep* buffer, freezing several minutes.
 or \\[wgrep-abort-changes] to abort changes.")))
 
 (defun wgrep-save-all-buffers ()
-  "Save buffers wgrep changed."
+  "Save the buffers that wgrep changed."
   (interactive)
   (let ((count 0))
     (mapc
@@ -526,15 +526,15 @@ or \\[wgrep-abort-changes] to abort changes.")))
      (buffer-list))
     (cond
      ((= count 0)
-      (message "No buffer is saved."))
+      (message "No buffer has been saved."))
      ((= count 1)
-      (message "Buffer is saved."))
+      (message "Buffer has been saved."))
      (t
-      (message "%d Buffers are saved." count)))))
+      (message "%d buffers have been saved." count)))))
 
 (defun wgrep-flush-current-line ()
-  "Flush current line and file buffer. Undo is disabled in this command.
-This command result immediately reflect to file buffer, although not saved.
+  "Flush current line and file buffer. Undo is disabled for this command.
+This command immediately changes the file buffer, although the buffer is not saved.
 "
   (interactive)
   (save-excursion

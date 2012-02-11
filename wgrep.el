@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 1.0.1
+;; Version: 1.0.2
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -50,8 +50,17 @@
 ;; C-c C-k : Discard all changes and exit.
 ;; C-x C-q : Exit wgrep mode.
 
-;; To save all buffers that wgrep changed, run
+;; * To save all buffers that wgrep has changed, run
+;;
 ;;   M-x wgrep-save-all-buffers
+
+;; * You can change the default key binding to switch to wgrep.
+;;
+;; (setq wgrep-enable-key "r")
+
+;; * To apply all changes wheather or not buffer is read-only.
+;;
+;; (setq wgrep-change-readonly-file t)
 
 ;;; History:
 
@@ -81,7 +90,7 @@
   :group 'grep)
 
 (defcustom wgrep-change-readonly-file nil
-  "*Non-nil means to change read-only files."
+  "*Non-nil means to enable change read-only files."
   :group 'wgrep
   :type 'boolean)
 
@@ -258,9 +267,11 @@
 
 (defun wgrep-display-physical-data ()
   (cond
+   ;; `funcall' is a trick to suppress the elint warnings.
    ((derived-mode-p 'image-mode)
-    (when (image-get-display-property)
-      (image-mode-as-text)))
+    ;; toggle to raw data if buffer has image.
+    (when (funcall 'image-get-display-property)
+      (funcall 'image-mode-as-text)))
    (t nil)))
 
 ;; not consider other edit. (ex: Undo or self-insert-command)

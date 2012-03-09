@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 1.0.2
+;; Version: 1.0.3
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -168,6 +168,7 @@
 
 (defconst wgrep-line-file-regexp (caar grep-regexp-alist))
 
+;;;###autoload(add-hook 'grep-setup-hook 'wgrep-setup)
 (add-hook 'grep-setup-hook 'wgrep-setup)
 
 (defvar wgrep-mode-map nil)
@@ -191,7 +192,9 @@
 
           map)))
 
+;;;###autoload
 (defun wgrep-setup ()
+  "Setup wgrep preparation."
   (define-key grep-mode-map wgrep-enable-key 'wgrep-change-to-wgrep-mode)
   ;; delete previous wgrep overlays
   (wgrep-cleanup-overlays (point-min) (point-max))

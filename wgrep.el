@@ -165,9 +165,6 @@
 
 (defconst wgrep-line-file-regexp (caar grep-regexp-alist))
 
-;;;###autoload(add-hook 'grep-setup-hook 'wgrep-setup)
-(add-hook 'grep-setup-hook 'wgrep-setup)
-
 (defvar wgrep-mode-map nil)
 (unless wgrep-mode-map
   (setq wgrep-mode-map
@@ -798,6 +795,13 @@ This command immediately changes the file buffer, although the buffer is not sav
       (when (funcall pred (car list))
         (throw 'found (car list)))
       (setq list (cdr list)))))
+
+;;;###autoload(add-hook 'grep-setup-hook 'wgrep-setup)
+(add-hook 'grep-setup-hook 'wgrep-setup)
+
+;; For `unload-feature'
+(defun wgrep-unload-function ()
+  (remove-hook 'grep-setup-hook 'wgrep-setup))
 
 (provide 'wgrep)
 

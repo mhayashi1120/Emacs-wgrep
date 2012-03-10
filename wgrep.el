@@ -80,9 +80,6 @@
 
 ;;; Code:
 
-(eval-when-compile
-  (require 'cl))
-
 (require 'grep)
 
 (defgroup wgrep nil
@@ -203,7 +200,7 @@
 
 (defun wgrep-maybe-echo-error-at-point ()
   (when (null (current-message))
-    (let ((o (find-if
+    (let ((o (wgrep-find-if
               (lambda (o)
                 (overlay-get o 'wgrep-reject-message))
               (overlays-in (line-beginning-position) (line-end-position)))))
@@ -241,7 +238,7 @@
       (setq ov
             (or
              ;; get existing overlay
-             (find-if
+             (wgrep-find-if
               (lambda (o)
                 (memq (overlay-get o 'face) '(wgrep-reject-face wgrep-done-face)))
               (overlays-in start (line-end-position)))
@@ -431,7 +428,7 @@
   (interactive)
   (let ((count 0))
     (save-excursion
-      (let ((not-yet (copy-seq wgrep-overlays)))
+      (let ((not-yet (copy-sequence wgrep-overlays)))
         (while wgrep-overlays
           (let ((ov (car wgrep-overlays)))
             (setq wgrep-overlays (cdr wgrep-overlays))
@@ -794,6 +791,13 @@ This command immediately changes the file buffer, although the buffer is not sav
       (error
        (wgrep-put-reject-face ov (prin1-to-string err))
        nil))))
+
+(defun wgrep-find-if (pred list)
+  (catch 'found
+    (while list
+      (when (funcall pred (car list))
+        (throw 'found (car list)))
+      (setq list (cdr list)))))
 
 (provide 'wgrep)
 

@@ -68,8 +68,6 @@
   (delete-file "test-data.txt"))
 
 ;; TODO 
-;; * utf-8 bom
-;; * multibyte character
 ;; * wgrep-toggle-readonly-area
 ;; * wgrep-abort-changes
 ;; * wgrep-exit

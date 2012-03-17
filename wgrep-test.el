@@ -13,11 +13,12 @@
       (insert-file-contents file)
       (buffer-string))))
 
-(defun wgrep-test--file (file contents)
+(defun wgrep-test--file (file contents &optional cs)
   ;; cleanup for convinience
   (let ((buf (get-file-buffer file)))
     (kill-buffer buf))
-  (write-region contents nil file))
+  (let ((coding-system-for-write cs))
+    (write-region contents nil file)))
 
 (ert-deftest wgrep-normal ()
   :tags '(wgrep)
@@ -46,6 +47,25 @@
   (should (equal "FOO2\nBAZ\n" (wgrep-test--contents "test-data.txt")))
   (delete-file "test-data.txt"))
 
+(ert-deftest wgrep-multibyte ()
+  :tags '(wgrep)
+  (wgrep-test--file "test-data.txt" "あ\nい\nう\n" 'utf-8-with-signature)
+  (wgrep-test--grep "grep -nH -e 'あ' -A 2 test-data.txt")
+  (wgrep-change-to-wgrep-mode)
+  (goto-char (point-min))
+  ;; BOM check is valid.
+  (should (re-search-forward "test-data\.txt:[0-9]+:.*\\(あ\\)$" nil t))
+  (replace-match "へのへのも" nil nil nil 1)
+  ;; 2nd line
+  (should (re-search-forward "test-data\.txt:[0-9]+:.*\\(い\\)$" nil t))
+  (replace-match "へじ" nil nil nil 1)
+  ;; apply to buffer
+  (wgrep-finish-edit)
+  ;; save to file
+  (wgrep-save-all-buffers)
+  ;; compare file contents is valid
+  (should (equal "へのへのも\nへじ\nう\n" (wgrep-test--contents "test-data.txt")))
+  (delete-file "test-data.txt"))
 
 ;; TODO 
 ;; * utf-8 bom

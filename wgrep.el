@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 1.0.3
+;; Version: 1.0.4
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -328,7 +328,7 @@
     (if (and regexp
              (setq str (encode-coding-string string grep-cs))
              (string-match regexp str))
-        (substring str (match-end 0))
+        (decode-coding-string (substring str (match-end 0)) cs)
       string)))
 
 (defun wgrep-put-color-file ()
@@ -795,6 +795,10 @@ This command immediately changes the file buffer, although the buffer is not sav
       (when (funcall pred (car list))
         (throw 'found (car list)))
       (setq list (cdr list)))))
+
+;;;
+;;; activate/deactivate marmalade install or github install.
+;;;
 
 ;;;###autoload(add-hook 'grep-setup-hook 'wgrep-setup)
 (add-hook 'grep-setup-hook 'wgrep-setup)

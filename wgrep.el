@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 1.0.4
+;; Version: 1.0.5
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -81,6 +81,9 @@
 ;;; Code:
 
 (require 'grep)
+
+(declare-function image-get-display-property "image-mode.el" ())
+(declare-function image-mode-as-text "image-mode.el" ())
 
 (defgroup wgrep nil
   "Customize wgrep"
@@ -267,8 +270,8 @@
    ;; `funcall' is a trick to suppress the elint warnings.
    ((derived-mode-p 'image-mode)
     ;; toggle to raw data if buffer has image.
-    (when (funcall 'image-get-display-property)
-      (funcall 'image-mode-as-text)))
+    (when (image-get-display-property)
+      (image-mode-as-text)))
    (t nil)))
 
 ;; not consider other edit. (ex: Undo or self-insert-command)
@@ -432,7 +435,7 @@
             (when (wgrep-changed-overlay-action ov)
               (delete-overlay ov)
               (setq not-yet (delq ov not-yet))
-              (incf count))))
+              (setq count (1+ count)))))
         ;; restore overlays
         (setq wgrep-overlays not-yet)))
     (wgrep-cleanup-temp-buffer)
@@ -538,7 +541,7 @@ or \\[wgrep-abort-changes] to abort changes.")))
                     wgrep-file-overlays
                     (buffer-modified-p))
            (basic-save-buffer)
-           (incf count))))
+           (setq count (1+ count)))))
      (buffer-list))
     (cond
      ((= count 0)

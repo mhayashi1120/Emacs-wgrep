@@ -89,3 +89,4 @@
 ;; * wgrep-abort-changes
 ;; * wgrep-exit
 ;; * broken file contents (invalid coding system)
+;; * modify file after grep

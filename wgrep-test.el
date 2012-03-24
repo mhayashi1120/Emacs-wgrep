@@ -54,10 +54,10 @@
   (wgrep-change-to-wgrep-mode)
   (goto-char (point-min))
   ;; BOM check is valid.
-  (should (re-search-forward "test-data\.txt:[0-9]+:.*\\(あ\\)$" nil t))
+  (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(あ\\)$" nil t))
   (replace-match "へのへのも" nil nil nil 1)
   ;; 2nd line
-  (should (re-search-forward "test-data\.txt:[0-9]+:.*\\(い\\)$" nil t))
+  (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(い\\)$" nil t))
   (replace-match "へじ" nil nil nil 1)
   ;; apply to buffer
   (wgrep-finish-edit)
@@ -74,7 +74,7 @@
   (wgrep-change-to-wgrep-mode)
   (goto-char (point-min))
   ;; BOM check is valid.
-  (should (re-search-forward "test-data\.txt:[0-9]+:.*\\(a\\)$" nil t))
+  (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(a\\)$" nil t))
   (replace-match "ABCD" nil nil nil 1)
   ;; apply to buffer
   (wgrep-finish-edit)
@@ -84,9 +84,35 @@
   (should (equal "ABCD\nb\n" (wgrep-test--contents "test-data.txt")))
   (delete-file "test-data.txt"))
 
+(ert-deftest wgrep-with-modify ()
+  :tags '(wgrep)
+  (wgrep-test--file "test-data.txt" "a\nb\nc\n")
+  (with-current-buffer (find-file-noselect "test-data.txt")
+    ;; modify file buffer
+    (goto-char (point-min))
+    (and (re-search-forward "^a" nil t)
+         (replace-match "hoge"))
+    (and (re-search-forward "^b" nil t)
+         (replace-match "foo")))
+  (wgrep-test--grep "grep -nH -e 'a' -A 2 test-data.txt")
+  (wgrep-change-to-wgrep-mode)
+  (goto-char (point-min))
+  (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(a\\)$" nil t))
+  (wgrep-flush-current-line)
+  (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(b\\)$" nil t))
+  (replace-match "B" nil nil nil 1)
+  (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(c\\)$" nil t))
+  (replace-match "C" nil nil nil 1)
+  ;; apply to buffer
+  (wgrep-finish-edit)
+  ;; save to file
+  (wgrep-save-all-buffers)
+  ;; compare file contents is valid
+  (should (equal "hoge\nfoo\nC\n" (wgrep-test--contents "test-data.txt")))
+  (delete-file "test-data.txt"))
+
 ;; TODO 
 ;; * wgrep-toggle-readonly-area
 ;; * wgrep-abort-changes
 ;; * wgrep-exit
 ;; * broken file contents (invalid coding system)
-;; * modify file after grep

@@ -357,40 +357,15 @@
   (save-excursion
     ;; looking-at destroy replace regexp..
     (save-match-data
-      (forward-line 0)
-      (let (inhibit-it)
-        ;; check file name at point
-        (when (looking-at wgrep-line-file-regexp)
-          ;; inhibit later process when modifying line header
-          (setq inhibit-it (> (match-end 0) beg))
-          (let ((header (match-string-no-properties 0))
-                (value (buffer-substring-no-properties
-                        (match-end 0) (line-end-position)))
-                ov)
-            (unless inhibit-it
-              (let ((ovs (overlays-in
-                          (line-beginning-position) (line-end-position))))
-                (while ovs
-                  ;; find overlay that have changed by user.
-                  (when (overlay-get (car ovs) 'wgrep-changed)
-                    ;; delete overlay if text is same as original value.
-                    (when (string= (overlay-get (car ovs) 'wgrep-original-value) value)
-                      (setq wgrep-overlays (remove (car ovs) wgrep-overlays))
-                      (delete-overlay (car ovs)))
-                    (setq ov (car ovs))
-                    (setq inhibit-it t))
-                  (setq ovs (cdr ovs)))))
-            (unless inhibit-it
-              ;; colorize changed text and evacuate the original value
-              (let ((origin (wgrep-get-original-value header)))
-                (setq ov (wgrep-make-overlay
-                          (line-beginning-position)
-                          (line-end-position)))
-                (overlay-put ov 'wgrep-changed t)
-                (overlay-put ov 'face 'wgrep-face)
-                (overlay-put ov 'priority 0)
-                (overlay-put ov 'wgrep-original-value origin)
-                (setq wgrep-overlays (cons ov wgrep-overlays))))))))))
+      (let ((ov (wgrep-get-editing-overlay beg end)))
+        ;; delete overlay if text is same as original value.
+        (cond
+         ((string= (overlay-get ov 'wgrep-original-value)
+                   (overlay-get ov 'wgrep-editing-value))
+          (setq wgrep-overlays (remove ov wgrep-overlays))
+          (delete-overlay ov))
+         ((not (memq ov wgrep-overlays))
+          (setq wgrep-overlays (cons ov wgrep-overlays))))))))
 
 (defun wgrep-get-editing-overlay (beg end)
   (goto-char beg)

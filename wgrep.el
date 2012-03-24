@@ -392,6 +392,36 @@
                 (overlay-put ov 'wgrep-original-value origin)
                 (setq wgrep-overlays (cons ov wgrep-overlays))))))))))
 
+(defun wgrep-get-editing-overlay (beg end)
+  (goto-char beg)
+  (let ((bol (line-beginning-position))
+        ov eol)
+    (goto-char end)
+    (setq eol (line-end-position))
+    (catch 'done
+      (dolist (o (overlays-in bol eol))
+        ;; find overlay that have changed by user.
+        (when (overlay-get o 'wgrep-changed)
+          (setq ov o)
+          (throw 'done o))))
+    (when ov
+      (setq bol (min beg (overlay-start ov))
+            eol (max (overlay-end ov) end)))
+    (goto-char bol)
+    (when (looking-at wgrep-line-file-regexp)
+      (let* ((header (match-string-no-properties 0))
+             (value (buffer-substring-no-properties (match-end 0) eol)))
+        (unless ov
+          (let ((origin (wgrep-get-original-value header)))
+            (setq ov (wgrep-make-overlay bol eol))
+            (overlay-put ov 'wgrep-changed t)
+            (overlay-put ov 'face 'wgrep-face)
+            (overlay-put ov 'priority 0)
+            (overlay-put ov 'wgrep-original-value origin)))
+        (move-overlay ov bol eol)
+        (overlay-put ov 'wgrep-editing-value value)))
+    ov))
+
 (defun wgrep-to-grep-mode ()
   (kill-local-variable 'query-replace-skip-read-only)
   (remove-hook 'after-change-functions 'wgrep-after-change-function t)

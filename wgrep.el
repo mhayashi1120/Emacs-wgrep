@@ -277,10 +277,8 @@
 ;; not consider other edit. (ex: Undo or self-insert-command)
 (defun wgrep-after-save-hook ()
   (remove-hook 'after-save-hook 'wgrep-after-save-hook t)
-  (mapc
-   (lambda (ov)
-     (delete-overlay ov))
-   wgrep-file-overlays)
+  (dolist (ov wgrep-file-overlays)
+    (delete-overlay ov))
   (kill-local-variable 'wgrep-file-overlays))
 
 (defun wgrep-apply-to-buffer (buffer info old-text)
@@ -540,15 +538,13 @@ or \\[wgrep-abort-changes] to abort changes.")))
   "Save the buffers that wgrep changed."
   (interactive)
   (let ((count 0))
-    (mapc
-     (lambda (b)
-       (with-current-buffer b
-         (when (and (local-variable-p 'wgrep-file-overlays)
-                    wgrep-file-overlays
-                    (buffer-modified-p))
-           (basic-save-buffer)
-           (setq count (1+ count)))))
-     (buffer-list))
+    (dolist (b (buffer-list))
+      (with-current-buffer b
+        (when (and (local-variable-p 'wgrep-file-overlays)
+                   wgrep-file-overlays
+                   (buffer-modified-p))
+          (basic-save-buffer)
+          (setq count (1+ count)))))
     (cond
      ((= count 0)
       (message "No buffer has been saved."))
@@ -753,12 +749,10 @@ This command immediately changes the file buffer, although the buffer is not sav
   "Cleanup temp buffer in *grep* buffer."
   (when (memq major-mode '(grep-mode))
     (let ((grep-buffer (current-buffer)))
-      (mapc
-       (lambda (buf)
-         (with-current-buffer buf
-           (when (eq grep-buffer wgrep-each-other-buffer)
-             (kill-buffer buf))))
-       (buffer-list)))
+      (dolist (buf (buffer-list))
+        (with-current-buffer buf
+          (when (eq grep-buffer wgrep-each-other-buffer)
+            (kill-buffer buf)))))
     (setq wgrep-each-other-buffer nil)))
 
 (defun wgrep-current-header ()

@@ -210,8 +210,8 @@
 
 (defun wgrep-set-readonly-area (state)
   (let ((inhibit-read-only t)
-        (regexp (format "\\(?:%s\\|\n\\)" wgrep-line-file-regexp))
-        after-change-functions)
+        (wgrep-inhibit-modification-hook t)
+        (regexp (format "\\(?:%s\\|\n\\)" wgrep-line-file-regexp)))
     (save-excursion
       (wgrep-goto-first-found)
       (while (re-search-forward regexp nil t)
@@ -219,8 +219,10 @@
          (match-beginning 0) (match-end 0) state)))
     (setq wgrep-readonly-state state)))
 
+(defvar wgrep-inhibit-modification-hook nil)
 (defun wgrep-after-change-function (beg end leng-before)
   (cond
+   (wgrep-inhibit-modification-hook nil)
    ((= (point-min) (point-max))
     ;; cleanup when first executing
     (wgrep-cleanup-overlays (point-min) (point-max)))
@@ -360,9 +362,10 @@
       (let ((ov (wgrep-get-editing-overlay beg end)))
         ;; delete overlay if text is same as original value.
         (cond
+         ((null ov))
          ((string= (overlay-get ov 'wgrep-original-value)
                    (overlay-get ov 'wgrep-editing-value))
-          (setq wgrep-overlays (remove ov wgrep-overlays))
+          (setq wgrep-overlays (remq ov wgrep-overlays))
           (delete-overlay ov))
          ((not (memq ov wgrep-overlays))
           (setq wgrep-overlays (cons ov wgrep-overlays))))))))
@@ -574,7 +577,8 @@ This command immediately changes the file buffer, although the buffer is not sav
              (origin (wgrep-get-original-value header))
              (info (wgrep-get-line-info t))
              (buffer (wgrep-get-file-buffer file)))
-        (let ((inhibit-quit t))
+        (let ((inhibit-quit t)
+              (wgrep-inhibit-modification-hook t))
           (when (wgrep-flush-apply-to-buffer buffer info origin)
             (wgrep-cleanup-overlays (line-beginning-position) (line-end-position))
             ;; disable undo and change *grep* buffer.
@@ -672,8 +676,8 @@ This command immediately changes the file buffer, although the buffer is not sav
 (defun wgrep-prepare-to-edit ()
   (save-excursion
     (let ((inhibit-read-only t)
-          after-change-functions buffer-read-only
-          beg end)
+          (wgrep-inhibit-modification-hook t)
+          buffer-read-only beg end)
       ;; Set read-only grep result header
       (setq beg (point-min))
       (wgrep-goto-first-found)
@@ -691,7 +695,7 @@ This command immediately changes the file buffer, although the buffer is not sav
 
 (defun wgrep-set-header/footer-read-only (state)
   (let ((inhibit-read-only t)
-        after-change-functions)
+        (wgrep-inhibit-modification-hook t))
     ;; header
     (let ((header-end (next-single-property-change (point-min) 'wgrep-header)))
       (when header-end
@@ -734,7 +738,7 @@ This command immediately changes the file buffer, although the buffer is not sav
           (savedc (current-column))
           (savedp (point))
           (inhibit-read-only t)
-          after-change-functions
+          (wgrep-inhibit-modification-hook t)
           buffer-read-only)
       (erase-buffer)
       (with-current-buffer tmpbuf

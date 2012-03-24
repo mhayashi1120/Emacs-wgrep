@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 1.0.5
+;; Version: 2.0.0
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -361,27 +361,33 @@
     (save-match-data
       (forward-line 0)
       (let (inhibit-it)
+        ;; check file name at point
         (when (looking-at wgrep-line-file-regexp)
-          ;; check file name point or not
+          ;; inhibit later process when modifying line header
           (setq inhibit-it (> (match-end 0) beg))
           (let ((header (match-string-no-properties 0))
                 (value (buffer-substring-no-properties
-                        (match-end 0) (line-end-position))))
+                        (match-end 0) (line-end-position)))
+                ov)
             (unless inhibit-it
               (let ((ovs (overlays-in
                           (line-beginning-position) (line-end-position))))
                 (while ovs
+                  ;; find overlay that have changed by user.
                   (when (overlay-get (car ovs) 'wgrep-changed)
+                    ;; delete overlay if text is same as original value.
                     (when (string= (overlay-get (car ovs) 'wgrep-original-value) value)
                       (setq wgrep-overlays (remove (car ovs) wgrep-overlays))
                       (delete-overlay (car ovs)))
+                    (setq ov (car ovs))
                     (setq inhibit-it t))
                   (setq ovs (cdr ovs)))))
             (unless inhibit-it
-              (let ((origin (wgrep-get-original-value header))
-                    (ov (wgrep-make-overlay
-                         (line-beginning-position)
-                         (line-end-position))))
+              ;; colorize changed text and evacuate the original value
+              (let ((origin (wgrep-get-original-value header)))
+                (setq ov (wgrep-make-overlay
+                          (line-beginning-position)
+                          (line-end-position)))
                 (overlay-put ov 'wgrep-changed t)
                 (overlay-put ov 'face 'wgrep-face)
                 (overlay-put ov 'priority 0)

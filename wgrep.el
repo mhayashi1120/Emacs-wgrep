@@ -360,33 +360,33 @@
     ;; looking-at destroy replace regexp..
     (save-match-data
       (forward-line 0)
-      (let ((inhibit-it nil)
-            header value origin ovs ov)
+      (let (inhibit-it)
         (when (looking-at wgrep-line-file-regexp)
           ;; check file name point or not
           (setq inhibit-it (> (match-end 0) beg))
-          (setq header (match-string-no-properties 0))
-          (setq value (buffer-substring-no-properties
-                       (match-end 0) (line-end-position)))
-          (unless inhibit-it
-            (setq ovs (overlays-in (line-beginning-position) (line-end-position)))
-            (while ovs
-              (when (overlay-get (car ovs) 'wgrep-changed)
-                (when (string= (overlay-get (car ovs) 'wgrep-original-value) value)
-                  (setq wgrep-overlays (remove (car ovs) wgrep-overlays))
-                  (delete-overlay (car ovs)))
-                (setq inhibit-it t))
-              (setq ovs (cdr ovs))))
-          (unless inhibit-it
-            (setq origin (wgrep-get-original-value header))
-            (setq ov (wgrep-make-overlay
-                      (line-beginning-position)
-                      (line-end-position)))
-            (overlay-put ov 'wgrep-changed t)
-            (overlay-put ov 'face 'wgrep-face)
-            (overlay-put ov 'priority 0)
-            (overlay-put ov 'wgrep-original-value origin)
-            (setq wgrep-overlays (cons ov wgrep-overlays))))))))
+          (let ((header (match-string-no-properties 0))
+                (value (buffer-substring-no-properties
+                        (match-end 0) (line-end-position))))
+            (unless inhibit-it
+              (let ((ovs (overlays-in
+                          (line-beginning-position) (line-end-position))))
+                (while ovs
+                  (when (overlay-get (car ovs) 'wgrep-changed)
+                    (when (string= (overlay-get (car ovs) 'wgrep-original-value) value)
+                      (setq wgrep-overlays (remove (car ovs) wgrep-overlays))
+                      (delete-overlay (car ovs)))
+                    (setq inhibit-it t))
+                  (setq ovs (cdr ovs)))))
+            (unless inhibit-it
+              (let ((origin (wgrep-get-original-value header))
+                    (ov (wgrep-make-overlay
+                         (line-beginning-position)
+                         (line-end-position))))
+                (overlay-put ov 'wgrep-changed t)
+                (overlay-put ov 'face 'wgrep-face)
+                (overlay-put ov 'priority 0)
+                (overlay-put ov 'wgrep-original-value origin)
+                (setq wgrep-overlays (cons ov wgrep-overlays))))))))))
 
 (defun wgrep-to-grep-mode ()
   (kill-local-variable 'query-replace-skip-read-only)
@@ -637,15 +637,14 @@ This command immediately changes the file buffer, although the buffer is not sav
 ;; -A -B -C output may be misunderstood and set read-only.
 ;; (ex: filename-20-2010/01/01 23:59:99)
 (defun wgrep-prepare-context-while (filename line forward)
-  (let ((diff (if forward 1 -1))
-        next line-head)
-    (setq next (+ diff line))
+  (let* ((diff (if forward 1 -1))
+         (next (+ diff line)))
     (forward-line diff)
     (while (looking-at (format "^%s\\(-\\)%d\\(-\\)" filename next))
-      (setq line-head (format "%s:%d:" filename next))
-      (replace-match line-head nil nil nil 0)
-      (forward-line diff)
-      (setq next (+ diff next)))))
+      (let ((line-head (format "%s:%d:" filename next)))
+        (replace-match line-head nil nil nil 0)
+        (forward-line diff)
+        (setq next (+ diff next))))))
 
 (defun wgrep-delete-region (min max)
   (remove-text-properties min max '(read-only) (current-buffer))
@@ -685,16 +684,15 @@ This command immediately changes the file buffer, although the buffer is not sav
 
 (defun wgrep-set-header/footer-read-only (state)
   (let ((inhibit-read-only t)
-        after-change-functions
-        beg end)
+        after-change-functions)
     ;; header
-    (setq end (next-single-property-change (point-min) 'wgrep-header))
-    (when end
-      (put-text-property (point-min) end 'read-only state))
+    (let ((header-end (next-single-property-change (point-min) 'wgrep-header)))
+      (when header-end
+        (put-text-property (point-min) header-end 'read-only state)))
     ;; footer
-    (setq beg (next-single-property-change (point-min) 'wgrep-footer))
-    (when beg
-      (put-text-property beg (point-max) 'read-only state))))
+    (let ((footer-beg (next-single-property-change (point-min) 'wgrep-footer)))
+      (when footer-beg
+        (put-text-property footer-beg (point-max) 'read-only state)))))
 
 (defun wgrep-cleanup-overlays (beg end)
   (let ((ovs (overlays-in beg end)))

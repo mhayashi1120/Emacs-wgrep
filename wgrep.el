@@ -168,6 +168,7 @@ a file."
 (defvar auto-coding-regexp-alist)
 
 (defconst wgrep-line-file-regexp (caar grep-regexp-alist))
+(defvar wgrep-inhibit-modification-hook nil)
 
 (defvar wgrep-mode-map nil)
 (unless wgrep-mode-map
@@ -221,7 +222,6 @@ a file."
          (match-beginning 0) (match-end 0) state)))
     (setq wgrep-readonly-state state)))
 
-(defvar wgrep-inhibit-modification-hook nil)
 (defun wgrep-after-change-function (beg end leng-before)
   (cond
    (wgrep-inhibit-modification-hook nil)
@@ -373,7 +373,7 @@ a file."
         (cond
          ((null ov))                    ; not a valid point
          ((string= (overlay-get ov 'wgrep-old-text)
-                   (overlay-get ov 'wgrep-editing-value))
+                   (overlay-get ov 'wgrep-edit-text))
           ;; back to unchanged
           (setq wgrep-overlays (remq ov wgrep-overlays))
           (delete-overlay ov))
@@ -408,7 +408,7 @@ a file."
             (overlay-put ov 'priority 0)
             (overlay-put ov 'wgrep-old-text old)))
         (move-overlay ov bol eol)
-        (overlay-put ov 'wgrep-editing-value value)))
+        (overlay-put ov 'wgrep-edit-text value)))
     ov))
 
 (defun wgrep-to-grep-mode ()
@@ -436,7 +436,7 @@ a file."
              (result (nth 2 info))
              (buffer (wgrep-get-file-buffer file))
              (old (overlay-get ov 'wgrep-old-text))
-             (new (overlay-get ov 'wgrep-editing-value)))
+             (new (overlay-get ov 'wgrep-edit-text)))
         (condition-case err
             (progn
               (wgrep-apply-to-buffer buffer old line new)
@@ -594,10 +594,11 @@ is not saved.
               (wgrep-inhibit-modification-hook t))
           (when (wgrep-flush-apply-to-buffer filename ov line old)
             (delete-overlay ov)
-            ;; disable undo and change *grep* buffer.
+            ;; disable undo temporarily and change *grep* buffer.
             (let ((buffer-undo-list t))
               (wgrep-delete-whole-line)
               (wgrep-after-delete-line filename line))
+            ;; correct evacuated buffer
             (with-current-buffer wgrep-each-other-buffer
               (let ((inhibit-read-only t))
                 (wgrep-after-delete-line filename line)))))))))

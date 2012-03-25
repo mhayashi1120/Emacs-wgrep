@@ -236,9 +236,19 @@ a file."
   (forward-line 0)
   (when (looking-at wgrep-line-file-regexp)
     (let ((name (match-string-no-properties 1))
-          (line (match-string-no-properties 3)))
+          (line (match-string-no-properties 3))
+          (start (match-end 0))
+          result)
+      ;; get a result overlay. (that is not a changed overlay)
+      (catch 'done
+        (dolist (o (overlays-in (overlay-start ov) (overlay-end ov)))
+          (when (overlay-get o 'wgrep-result)
+            (setq result o)))
+        (setq result (wgrep-make-overlay start (overlay-end ov)))
+        (overlay-put result 'wgrep-result t))
       (list (expand-file-name name default-directory)
-            (string-to-number line)))))
+            (string-to-number line)
+            result))))
 
 (defun wgrep-get-flush-overlay ()
   (catch 'done
@@ -281,7 +291,7 @@ a file."
     (delete-overlay ov))
   (kill-local-variable 'wgrep-file-overlays))
 
-(defun wgrep-apply-to-buffer (buffer old-text line &optional new-text)
+(defun wgrep-apply-to-buffer (buffer old line &optional new)
   "*The changes in the grep buffer are applied to the file"
   (with-current-buffer buffer
     (let ((inhibit-read-only wgrep-change-readonly-file)
@@ -295,18 +305,18 @@ a file."
         (when (and (= line 1)
                    coding
                    (coding-system-get coding :bom))
-          (setq old-text (wgrep-string-replace-bom old-text coding))
-          (when new-text
-            (setq new-text (wgrep-string-replace-bom new-text coding))))
-        (unless (string= old-text
+          (setq old (wgrep-string-replace-bom old coding))
+          (when new
+            (setq new (wgrep-string-replace-bom new coding))))
+        (unless (string= old
                          (buffer-substring
                           (line-beginning-position) (line-end-position)))
           (signal 'wgrep-error "Buffer was changed after grep."))
         (cond
-         (new-text
-          (wgrep-replace-to-new-line new-text))
+         (new
+          (wgrep-replace-to-new-line new))
          (t
-          ;; new-text nil means flush whole line.
+          ;; new nil means flush whole line.
           (wgrep-flush-pop-deleting-line)))))))
 
 (defun wgrep-replace-to-new-line (new-text)
@@ -423,19 +433,20 @@ a file."
      (t
       (let* ((file (nth 0 info))
              (line (nth 1 info))
+             (result (nth 2 info))
              (buffer (wgrep-get-file-buffer file))
              (old (overlay-get ov 'wgrep-old-text))
              (new (overlay-get ov 'wgrep-editing-value)))
         (condition-case err
             (progn
               (wgrep-apply-to-buffer buffer old line new)
-              (wgrep-put-done-face ov)
+              (wgrep-put-done-face result)
               t)
           (wgrep-error
-           (wgrep-put-reject-face ov (cdr err))
+           (wgrep-put-reject-face result (cdr err))
            nil)
           (error
-           (wgrep-put-reject-face ov (prin1-to-string err))
+           (wgrep-put-reject-face result (prin1-to-string err))
            nil)))))))
 
 (defun wgrep-finish-edit ()
@@ -791,8 +802,7 @@ is not saved.
 
 (defun wgrep-flush-apply-to-buffer (filename ov line old)
   (let* ((file (expand-file-name filename default-directory))
-         (buffer (wgrep-get-file-buffer file))
-         (info (list file line nil ov)))
+         (buffer (wgrep-get-file-buffer file)))
     (condition-case err
         (progn
           (wgrep-apply-to-buffer buffer old line)

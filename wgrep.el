@@ -135,7 +135,8 @@
      (:foreground "red" :weight bold))
     (t
      ()))
-  "*Face used for the line in the grep buffer that can not be applied to a file."
+  "*Face used for the line in the grep buffer that can not be applied to
+a file."
   :group 'wgrep)
 
 (defface wgrep-done-face
@@ -203,7 +204,8 @@
     (let ((o (wgrep-find-if
               (lambda (o)
                 (overlay-get o 'wgrep-reject-message))
-              (overlays-in (line-beginning-position) (line-end-position)))))
+              (overlays-in
+               (line-beginning-position) (line-end-position)))))
       (when o
         (let (message-log-max)
           (message "%s" (overlay-get o 'wgrep-reject-message)))))))
@@ -242,7 +244,8 @@
              ;; get existing overlay
              (wgrep-find-if
               (lambda (o)
-                (memq (overlay-get o 'face) '(wgrep-reject-face wgrep-done-face)))
+                (memq (overlay-get o 'face)
+                      '(wgrep-reject-face wgrep-done-face)))
               (overlays-in start (line-end-position)))
              (wgrep-make-overlay start (line-end-position))))
       (list (expand-file-name name default-directory)
@@ -289,7 +292,8 @@
     (let ((line (nth 1 info))
           (new-text (nth 2 info))
           (result (nth 3 info))
-          (inhibit-read-only wgrep-change-readonly-file))
+          (inhibit-read-only wgrep-change-readonly-file)
+          (coding buffer-file-coding-system))
       (wgrep-check-buffer)
       (wgrep-display-physical-data)
       (save-restriction
@@ -297,13 +301,14 @@
         (wgrep-goto-line line)
         ;;FIXME simply do this?
         (when (and (= line 1)
-                   buffer-file-coding-system
-                   (coding-system-get buffer-file-coding-system :bom))
-          (setq old-text (wgrep-string-replace-bom old-text buffer-file-coding-system))
+                   coding
+                   (coding-system-get coding :bom))
+          (setq old-text (wgrep-string-replace-bom old-text coding))
           (when new-text
-            (setq new-text (wgrep-string-replace-bom new-text buffer-file-coding-system))))
+            (setq new-text (wgrep-string-replace-bom new-text coding))))
         (unless (string= old-text
-                         (buffer-substring (line-beginning-position) (line-end-position)))
+                         (buffer-substring
+                          (line-beginning-position) (line-end-position)))
           (signal 'wgrep-error "Buffer was changed after grep."))
         (cond
          (new-text
@@ -362,12 +367,14 @@
       (let ((ov (wgrep-get-editing-overlay beg end)))
         ;; delete overlay if text is same as original value.
         (cond
-         ((null ov))
+         ((null ov))                    ; not a valid point
          ((string= (overlay-get ov 'wgrep-original-value)
                    (overlay-get ov 'wgrep-editing-value))
+          ;; back to unchanged
           (setq wgrep-overlays (remq ov wgrep-overlays))
           (delete-overlay ov))
          ((not (memq ov wgrep-overlays))
+          ;; register overlay
           (setq wgrep-overlays (cons ov wgrep-overlays))))))))
 
 (defun wgrep-get-editing-overlay (beg end)
@@ -403,7 +410,8 @@
 (defun wgrep-to-grep-mode ()
   (kill-local-variable 'query-replace-skip-read-only)
   (remove-hook 'after-change-functions 'wgrep-after-change-function t)
-  ;; do not remove `wgrep-maybe-echo-error-at-point' that display errors at point
+  ;; do not remove `wgrep-maybe-echo-error-at-point' that display
+  ;; errors at point
   (use-local-map grep-mode-map)
   (set-buffer-modified-p nil)
   (setq buffer-undo-list nil)
@@ -517,7 +525,8 @@ Example:
 (defun wgrep-change-to-wgrep-mode ()
   "Change to wgrep mode.
 
-When the *grep* buffer is huge, this might freeze your Emacs for several minutes.
+When the *grep* buffer is huge, this might freeze your Emacs
+for several minutes.
 "
   (interactive)
   (unless (eq major-mode 'grep-mode)
@@ -561,7 +570,8 @@ or \\[wgrep-abort-changes] to abort changes.")))
 
 (defun wgrep-flush-current-line ()
   "Flush current line and file buffer. Undo is disabled for this command.
-This command immediately changes the file buffer, although the buffer is not saved.
+This command immediately changes the file buffer, although the buffer
+is not saved.
 "
   (interactive)
   (save-excursion
@@ -578,7 +588,8 @@ This command immediately changes the file buffer, although the buffer is not sav
         (let ((inhibit-quit t)
               (wgrep-inhibit-modification-hook t))
           (when (wgrep-flush-apply-to-buffer buffer info origin)
-            (wgrep-cleanup-overlays (line-beginning-position) (line-end-position))
+            (wgrep-cleanup-overlays
+             (line-beginning-position) (line-end-position))
             ;; disable undo and change *grep* buffer.
             (let ((buffer-undo-list t))
               (wgrep-delete-whole-line)
@@ -590,7 +601,8 @@ This command immediately changes the file buffer, although the buffer is not sav
 (defun wgrep-after-delete-line (filename delete-line)
   (save-excursion
     (wgrep-goto-first-found)
-    (let ((regexp (format "^%s\\(?::\\)\\([0-9]+\\)\\(?::\\)" (regexp-quote filename))))
+    (let ((regexp (format "^%s\\(?::\\)\\([0-9]+\\)\\(?::\\)"
+                          (regexp-quote filename))))
       (while (not (eobp))
         (when (looking-at regexp)
           (let ((line (string-to-number (match-string 1)))
@@ -603,7 +615,8 @@ This command immediately changes the file buffer, although the buffer is not sav
              ((> line delete-line)
               ;; down line number
               (let ((line-head (format "%s:%d:" filename (1- line))))
-                (wgrep-set-readonly-property 0 (length line-head) read-only line-head)
+                (wgrep-set-readonly-property
+                 0 (length line-head) read-only line-head)
                 (replace-match line-head nil nil nil 0))))))
         (forward-line 1)))))
 

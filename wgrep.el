@@ -441,13 +441,11 @@
   (let ((count 0))
     (save-excursion
       (let ((not-yet (copy-sequence wgrep-overlays)))
-        (while wgrep-overlays
-          (let ((ov (car wgrep-overlays)))
-            (setq wgrep-overlays (cdr wgrep-overlays))
-            (when (wgrep-changed-overlay-action ov)
-              (delete-overlay ov)
-              (setq not-yet (delq ov not-yet))
-              (setq count (1+ count)))))
+        (dolist (ov wgrep-overlays)
+          (when (wgrep-changed-overlay-action ov)
+            (delete-overlay ov)
+            (setq not-yet (delq ov not-yet))
+            (setq count (1+ count))))
         ;; restore overlays
         (setq wgrep-overlays not-yet)))
     (wgrep-cleanup-temp-buffer)
@@ -706,11 +704,9 @@ This command immediately changes the file buffer, although the buffer is not sav
         (put-text-property footer-beg (point-max) 'read-only state)))))
 
 (defun wgrep-cleanup-overlays (beg end)
-  (let ((ovs (overlays-in beg end)))
-    (while ovs
-      (when (overlay-get (car ovs) 'wgrep)
-        (delete-overlay (car ovs)))
-      (setq ovs (cdr ovs)))))
+  (dolist (ov (overlays-in beg end))
+    (when (overlay-get ov 'wgrep)
+      (delete-overlay ov))))
 
 (defun wgrep-make-overlay (beg end)
   (let ((o (make-overlay beg end nil nil t)))
@@ -801,10 +797,9 @@ This command immediately changes the file buffer, although the buffer is not sav
 
 (defun wgrep-find-if (pred list)
   (catch 'found
-    (while list
-      (when (funcall pred (car list))
-        (throw 'found (car list)))
-      (setq list (cdr list)))))
+    (dolist (x list)
+      (when (funcall pred x)
+        (throw 'found x)))))
 
 ;;;
 ;;; activate/deactivate marmalade install or github install.

@@ -236,12 +236,9 @@ a file."
   (forward-line 0)
   (when (looking-at wgrep-line-file-regexp)
     (let ((name (match-string-no-properties 1))
-          (line (match-string-no-properties 3))
-          (text (overlay-get ov 'wgrep-editing-value))
-          (start (match-beginning 4)))
+          (line (match-string-no-properties 3)))
       (list (expand-file-name name default-directory)
-            (string-to-number line)
-            text ov))))
+            (string-to-number line)))))
 
 (defun wgrep-get-flush-overlay ()
   (catch 'done
@@ -284,13 +281,10 @@ a file."
     (delete-overlay ov))
   (kill-local-variable 'wgrep-file-overlays))
 
-(defun wgrep-apply-to-buffer (buffer info old-text)
+(defun wgrep-apply-to-buffer (buffer old-text line &optional new-text)
   "*The changes in the grep buffer are applied to the file"
   (with-current-buffer buffer
-    (let ((line (nth 1 info))
-          (new-text (nth 2 info))
-          (result (nth 3 info))
-          (inhibit-read-only wgrep-change-readonly-file)
+    (let ((inhibit-read-only wgrep-change-readonly-file)
           (coding buffer-file-coding-system))
       (wgrep-check-buffer)
       (wgrep-display-physical-data)
@@ -365,10 +359,10 @@ a file."
     ;; looking-at destroy replace regexp..
     (save-match-data
       (let ((ov (wgrep-get-editing-overlay beg end)))
-        ;; delete overlay if text is same as original value.
+        ;; delete overlay if text is same as old value.
         (cond
          ((null ov))                    ; not a valid point
-         ((string= (overlay-get ov 'wgrep-original-value)
+         ((string= (overlay-get ov 'wgrep-old-text)
                    (overlay-get ov 'wgrep-editing-value))
           ;; back to unchanged
           (setq wgrep-overlays (remq ov wgrep-overlays))
@@ -397,12 +391,12 @@ a file."
       (let* ((header (match-string-no-properties 0))
              (value (buffer-substring-no-properties (match-end 0) eol)))
         (unless ov
-          (let ((origin (wgrep-get-original-value header)))
+          (let ((old (wgrep-get-old-text header)))
             (setq ov (wgrep-make-overlay bol eol))
             (overlay-put ov 'wgrep-changed t)
             (overlay-put ov 'face 'wgrep-face)
             (overlay-put ov 'priority 0)
-            (overlay-put ov 'wgrep-original-value origin)))
+            (overlay-put ov 'wgrep-old-text old)))
         (move-overlay ov bol eol)
         (overlay-put ov 'wgrep-editing-value value)))
     ov))
@@ -428,11 +422,13 @@ a file."
       t)
      (t
       (let* ((file (nth 0 info))
+             (line (nth 1 info))
              (buffer (wgrep-get-file-buffer file))
-             (origin (overlay-get ov 'wgrep-original-value)))
+             (old (overlay-get ov 'wgrep-old-text))
+             (new (overlay-get ov 'wgrep-editing-value)))
         (condition-case err
             (progn
-              (wgrep-apply-to-buffer buffer info origin)
+              (wgrep-apply-to-buffer buffer old line new)
               (wgrep-put-done-face ov)
               t)
           (wgrep-error
@@ -582,10 +578,10 @@ is not saved.
              (filename (match-string-no-properties 1))
              (line (string-to-number (match-string 3)))
              (ov (wgrep-get-flush-overlay))
-             (origin (wgrep-get-original-value header)))
+             (old (wgrep-get-old-text header)))
         (let ((inhibit-quit t)
               (wgrep-inhibit-modification-hook t))
-          (when (wgrep-flush-apply-to-buffer filename ov line origin)
+          (when (wgrep-flush-apply-to-buffer filename ov line old)
             (delete-overlay ov)
             ;; disable undo and change *grep* buffer.
             (let ((buffer-undo-list t))
@@ -776,7 +772,7 @@ is not saved.
     (when (looking-at wgrep-line-file-regexp)
       (match-string-no-properties 0))))
 
-(defun wgrep-get-original-value (header)
+(defun wgrep-get-old-text (header)
   (when (and wgrep-each-other-buffer
              (buffer-live-p wgrep-each-other-buffer))
     (with-current-buffer wgrep-each-other-buffer
@@ -793,13 +789,13 @@ is not saved.
     (wgrep-delete-whole-line)
     (sit-for 0.3)))
 
-(defun wgrep-flush-apply-to-buffer (filename ov line origin)
+(defun wgrep-flush-apply-to-buffer (filename ov line old)
   (let* ((file (expand-file-name filename default-directory))
          (buffer (wgrep-get-file-buffer file))
          (info (list file line nil ov)))
     (condition-case err
         (progn
-          (wgrep-apply-to-buffer buffer info origin)
+          (wgrep-apply-to-buffer buffer old line)
           t)
       (wgrep-error
        (wgrep-put-reject-face ov (cdr err))

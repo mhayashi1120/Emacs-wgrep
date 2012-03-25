@@ -422,52 +422,23 @@ a file."
   (setq buffer-undo-list nil)
   (setq buffer-read-only t))
 
-(defun wgrep-changed-overlay-action (ov)
-  (let (info)
-    (cond
-     ((eq (overlay-start ov) (overlay-end ov))
-      ;; ignore removed line or removed overlay
-      t)
-     ((null (setq info (wgrep-get-edit-info ov)))
-      ;; ignore non grep result line.
-      t)
-     (t
-      (let* ((buffer (nth 0 info))
-             (line (nth 1 info))
-             (result (nth 2 info))
-             (old (overlay-get ov 'wgrep-old-text))
-             (new (overlay-get ov 'wgrep-edit-text)))
-        (condition-case err
-            (progn
-              (wgrep-apply-to-buffer buffer old line new)
-              (wgrep-put-done-face result)
-              t)
-          (wgrep-error
-           (wgrep-put-reject-face result (cdr err))
-           nil)
-          (error
-           (wgrep-put-reject-face result (prin1-to-string err))
-           nil)))))))
-
 (defun wgrep-finish-edit ()
   "Apply changes to file buffers."
   (interactive)
-  (let ((count 0))
-    (save-excursion
-      (let ((not-yet (copy-sequence wgrep-overlays)))
-        (dolist (ov wgrep-overlays)
-          (when (wgrep-changed-overlay-action ov)
-            (delete-overlay ov)
-            (setq not-yet (delq ov not-yet))
-            (setq count (1+ count))))
-        ;; restore overlays
-        (setq wgrep-overlays not-yet)))
+  (let ((all-tran (wgrep-calculate-transaction))
+        done)
+    (dolist (buf-tran all-tran)
+      (let ((commited (wgrep-commit-buffer (car buf-tran) (cdr buf-tran))))
+        (setq done (append done commited))))
+    ;; restore overlays
+    (dolist (ov done)
+      (setq wgrep-overlays (delq ov wgrep-overlays)))
     (wgrep-cleanup-temp-buffer)
     (wgrep-to-grep-mode)
-    (let ((msg (format "(%d changed)" count)))
+    (let ((msg (format "(%d changed)" (length done))))
       (cond
        ((null wgrep-overlays)
-        (if (= count 0)
+        (if (= (length done) 0)
             (message "(No changes to be performed)")
           (message "Successfully finished. %s" msg)))
        ((= (length wgrep-overlays) 1)
@@ -815,89 +786,6 @@ is not saved.
        (wgrep-put-reject-face ov (prin1-to-string err))
        nil))))
 
-;;;
-;;; TODO testing
-;;;
-
-(defun wgrep-undo-all-buffers ()
-  "Undo buffers wgrep has changed."
-  (interactive)
-  (let ((count 0))
-    (dolist (b (buffer-list))
-      (with-current-buffer b
-        (when (and (local-variable-p 'wgrep-file-overlays)
-                   wgrep-file-overlays
-                   (buffer-modified-p))
-          ;;TODO undo only wgrep modification..
-          (undo)
-          (setq count (1+ count)))))
-    (cond
-     ((= count 0)
-      (message "Undo no buffer."))
-     ((= count 1)
-      (message "Undo a buffer."))
-     (t
-      (message "Undo %d buffers." count)))))
-
-(defun wgrep-map (function)
-  (save-excursion
-    (let (start end)
-      (wgrep-goto-first-found)
-      (setq start (point))
-      (wgrep-goto-end-of-found)
-      (setq end (point))
-      (save-restriction
-        (narrow-to-region start end)
-        (goto-char (point-min))
-        (while (not (eobp))
-          (when (looking-at wgrep-line-file-regexp)
-            (let* ((file (match-string-no-properties 1))
-                   (buffer (wgrep-get-file-buffer file))
-                   markers diff)
-              (with-current-buffer buffer
-                (setq markers (wgrep-map-line-markers))
-                (save-excursion
-                  (save-match-data
-                    (funcall function)))
-                (setq diff (wgrep-map-line-diff markers)))
-              (wgrep-map-after-call file diff)
-              (with-current-buffer wgrep-each-other-buffer
-                (wgrep-map-after-call file diff))))
-          (forward-line 1))))))
-
-;;TODO not tested yet.
-(defun wgrep-map-after-call (file diff)
-  (let ((inhibit-read-only t)
-        (file-regexp (regexp-quote file))
-        after-change-functions)
-    (save-excursion
-      (dolist (pair diff)
-        (let ((old (car pair))
-              (new (cdr pair)))
-          (goto-char (point-min))
-          (when (re-search-forward (format "^%s:\\(%d\\):" file-regexp old) nil t)
-            (replace-match (number-to-string new) nil nil nil 1)))))))
-
-(defun wgrep-map-line-markers ()
-  (let (markers)
-    (save-excursion
-      (goto-char (point-min))
-      (while (not (eobp))
-        (setq markers (cons (point-marker) markers))
-        (forward-line 1)))
-    (nreverse markers)))
-
-;;TODO deleted line.
-(defun wgrep-map-line-diff (markers)
-  (let ((num 1)
-        (ret '()))
-    (dolist (marker markers)
-      (let ((new (line-number-at-pos (marker-position marker))))
-        (when (/= new num)
-          (setq ret (cons (cons num new) ret))))
-      (setq num (1+ num)))
-    (nreverse ret)))
-
 (defun wgrep-transaction-editing-list ()
   (let (info res)
     (dolist (ov wgrep-overlays)
@@ -987,31 +875,6 @@ is not saved.
                (wgrep-put-reject-face result (prin1-to-string err))))))
         (nreverse done)))))
 
-(defun wgrep-finish-edit2 ()
-  "Apply changes to file buffers."
-  (interactive)
-  (let ((all-tran (wgrep-calculate-transaction))
-        done)
-    (dolist (buf-tran all-tran)
-      (let ((commited (wgrep-commit-buffer (car buf-tran) (cdr buf-tran))))
-        (setq done (append done commited))))
-    ;; restore overlays
-    (dolist (ov done)
-      (setq wgrep-overlays (delq ov wgrep-overlays)))
-    (wgrep-cleanup-temp-buffer)
-    (wgrep-to-grep-mode)
-    (let ((msg (format "(%d changed)" (length done))))
-      (cond
-       ((null wgrep-overlays)
-        (if (= (length done) 0)
-            (message "(No changes to be performed)")
-          (message "Successfully finished. %s" msg)))
-       ((= (length wgrep-overlays) 1)
-        (message "There is an unapplied change. %s" msg))
-       (t
-        (message "There are %d unapplied changes. %s"
-                 (length wgrep-overlays) msg))))))
-
 (defun wgrep-apply-change (marker old &optional new)
   "*The changes in the grep buffer are applied to the file"
   (let ((coding buffer-file-coding-system))
@@ -1033,6 +896,89 @@ is not saved.
       ;;TODO suppress popup
       ;; new nil means flush whole line.
       (wgrep-flush-pop-deleting-line)))))
+
+;;;
+;;; TODO testing
+;;;
+
+(defun wgrep-undo-all-buffers ()
+  "Undo buffers wgrep has changed."
+  (interactive)
+  (let ((count 0))
+    (dolist (b (buffer-list))
+      (with-current-buffer b
+        (when (and (local-variable-p 'wgrep-file-overlays)
+                   wgrep-file-overlays
+                   (buffer-modified-p))
+          ;;TODO undo only wgrep modification..
+          (undo)
+          (setq count (1+ count)))))
+    (cond
+     ((= count 0)
+      (message "Undo no buffer."))
+     ((= count 1)
+      (message "Undo a buffer."))
+     (t
+      (message "Undo %d buffers." count)))))
+
+(defun wgrep-map (function)
+  (save-excursion
+    (let (start end)
+      (wgrep-goto-first-found)
+      (setq start (point))
+      (wgrep-goto-end-of-found)
+      (setq end (point))
+      (save-restriction
+        (narrow-to-region start end)
+        (goto-char (point-min))
+        (while (not (eobp))
+          (when (looking-at wgrep-line-file-regexp)
+            (let* ((file (match-string-no-properties 1))
+                   (buffer (wgrep-get-file-buffer file))
+                   markers diff)
+              (with-current-buffer buffer
+                (setq markers (wgrep-map-line-markers))
+                (save-excursion
+                  (save-match-data
+                    (funcall function)))
+                (setq diff (wgrep-map-line-diff markers)))
+              (wgrep-map-after-call file diff)
+              (with-current-buffer wgrep-each-other-buffer
+                (wgrep-map-after-call file diff))))
+          (forward-line 1))))))
+
+;;TODO not tested yet.
+(defun wgrep-map-after-call (file diff)
+  (let ((inhibit-read-only t)
+        (file-regexp (regexp-quote file))
+        after-change-functions)
+    (save-excursion
+      (dolist (pair diff)
+        (let ((old (car pair))
+              (new (cdr pair)))
+          (goto-char (point-min))
+          (when (re-search-forward (format "^%s:\\(%d\\):" file-regexp old) nil t)
+            (replace-match (number-to-string new) nil nil nil 1)))))))
+
+(defun wgrep-map-line-markers ()
+  (let (markers)
+    (save-excursion
+      (goto-char (point-min))
+      (while (not (eobp))
+        (setq markers (cons (point-marker) markers))
+        (forward-line 1)))
+    (nreverse markers)))
+
+;;TODO deleted line.
+(defun wgrep-map-line-diff (markers)
+  (let ((num 1)
+        (ret '()))
+    (dolist (marker markers)
+      (let ((new (line-number-at-pos (marker-position marker))))
+        (when (/= new num)
+          (setq ret (cons (cons num new) ret))))
+      (setq num (1+ num)))
+    (nreverse ret)))
 
 ;;;
 ;;; activate/deactivate marmalade install or github install.

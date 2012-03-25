@@ -898,7 +898,7 @@ is not saved.
       (setq num (1+ num)))
     (nreverse ret)))
 
-(defun wgrep-editing-result ()
+(defun wgrep-editing-list ()
   (let (info res)
     (dolist (ov wgrep-overlays res)
       (cond
@@ -914,18 +914,101 @@ is not saved.
                (new (overlay-get ov 'wgrep-edit-text)))
           (setq res
                 (cons
-                 (list buffer line result old new)
+                 (list buffer line old new result ov)
                  res))))))))
 
 (defun wgrep-calculate-transaction ()
-  (let ((editing (wgrep-editing-result))
-        res)
-    (dolist (x editing res)
-      (let ((pair (assq (car x) res)))
+  (let ((edit-list (wgrep-editing-list))
+        ;; key ::= buffer
+        ;; value ::= edit ...
+        ;; edit ::= line old-text new-text result-overlay edit-overlay
+        buffer-alist)
+    (dolist (x edit-list)
+      (let ((pair (assq (car x) buffer-alist)))
         (unless pair
           (setq pair (cons (car x) nil))
-          (setq res (cons pair res)))
-        (setcdr pair (cons (cdr x) (cdr pair)))))))
+          (setq buffer-alist (cons pair buffer-alist)))
+        (setcdr pair (cons (cdr x) (cdr pair)))))
+    (dolist (y buffer-alist)
+      (with-current-buffer (car y)
+        (save-restriction
+          (widen)
+          (dolist (z (cdr y))
+            (wgrep-goto-line (car z))
+            (setcar z (point-marker))))))
+    buffer-alist))
+
+(defun wgrep-commit-buffer (buffer tran)
+  (with-current-buffer buffer
+    (let ((inhibit-read-only wgrep-change-readonly-file)
+          done)
+      (wgrep-check-buffer)
+      (wgrep-display-physical-data)
+      (save-restriction
+        (widen)
+        (dolist (info tran)
+          (let ((marker (nth 0 info))
+                (old (nth 1 info))
+                (new (nth 2 info))
+                (result (nth 3 info))
+                (ov (nth 4 info)))
+            (condition-case err
+                (progn
+                  (wgrep-apply-change marker old new)
+                  (wgrep-put-done-face result)
+                  (delete-overlay ov)
+                  (setq done (cons ov done)))
+              (wgrep-error
+               (wgrep-put-reject-face result (cdr err)))
+              (error
+               (wgrep-put-reject-face result (prin1-to-string err)))))))
+      (nreverse done))))
+
+(defun wgrep-finish-edit2 ()
+  "Apply changes to file buffers."
+  (interactive)
+  (let ((all-tran (wgrep-calculate-transaction))
+        done)
+    (dolist (buf-tran all-tran)
+      (let ((commited (wgrep-commit-buffer (car buf-tran) (cdr buf-tran))))
+        (setq done (append done commited))))
+    ;; restore overlays
+    (dolist (ov done)
+      (setq wgrep-overlays (delq ov wgrep-overlays)))
+    (wgrep-cleanup-temp-buffer)
+    (wgrep-to-grep-mode)
+    (let ((msg (format "(%d changed)" (length done))))
+      (cond
+       ((null wgrep-overlays)
+        (if (= (length done) 0)
+            (message "(No changes to be performed)")
+          (message "Successfully finished. %s" msg)))
+       ((= (length wgrep-overlays) 1)
+        (message "There is an unapplied change. %s" msg))
+       (t
+        (message "There are %d unapplied changes. %s"
+                 (length wgrep-overlays) msg))))))
+
+(defun wgrep-apply-change (marker old &optional new)
+  "*The changes in the grep buffer are applied to the file"
+  (let ((coding buffer-file-coding-system))
+    (goto-char marker)
+    (when (and (= (point-min-marker) marker)
+               coding
+               (coding-system-get coding :bom))
+      (setq old (wgrep-string-replace-bom old coding))
+      (when new
+        (setq new (wgrep-string-replace-bom new coding))))
+    (unless (string= old
+                     (buffer-substring
+                      (line-beginning-position) (line-end-position)))
+      (signal 'wgrep-error "Buffer was changed after grep."))
+    (cond
+     (new
+      (wgrep-replace-to-new-line new))
+     (t
+      ;; new nil means flush whole line.
+      (wgrep-flush-pop-deleting-line)))))
 
 ;;;
 ;;; activate/deactivate marmalade install or github install.

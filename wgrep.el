@@ -898,54 +898,77 @@ is not saved.
       (setq num (1+ num)))
     (nreverse ret)))
 
-(defun wgrep-editing-list ()
+(defun wgrep-transaction-editing-list ()
   (let (info res)
-    (dolist (ov wgrep-overlays res)
+    (dolist (ov wgrep-overlays)
+      (goto-char (overlay-start ov))
+      (forward-line 0)
       (cond
-        ;; ignore removed line or removed overlay
+       ;; ignore removed line or removed overlay
        ((eq (overlay-start ov) (overlay-end ov)))
        ;; ignore non grep result line.
        ((null (setq info (wgrep-get-edit-info ov))))
-       (t
-        (let* ((buffer (nth 0 info))
-               (line (nth 1 info))
-               (result (nth 2 info))
+       ((looking-at wgrep-line-file-regexp)
+        (let* ((name (match-string-no-properties 1))
+               (line (match-string-no-properties 3))
+               (start (match-end 0))
+               (file (expand-file-name name default-directory))
+               (buffer (wgrep-get-file-buffer file))
+               (linum (string-to-number line))
                (old (overlay-get ov 'wgrep-old-text))
-               (new (overlay-get ov 'wgrep-edit-text)))
+               (new (overlay-get ov 'wgrep-edit-text))
+               result)
+          ;; wgrep-result overlay show the commiting of this editing
+          (catch 'done
+            (dolist (o (overlays-in (overlay-start ov) (overlay-end ov)))
+              (when (overlay-get o 'wgrep-result)
+                ;; get existing overlay
+                (setq result o)))
+            ;; create overlay to show result of committing
+            (setq result (wgrep-make-overlay start (overlay-end ov)))
+            (overlay-put result 'wgrep-result t))
           (setq res
                 (cons
-                 (list buffer line old new result ov)
-                 res))))))))
+                 (list buffer linum old new result ov)
+                 res))))))
+    (nreverse res)))
 
 (defun wgrep-calculate-transaction ()
-  (let ((edit-list (wgrep-editing-list))
+  (let ((edit-list (wgrep-transaction-editing-list))
         ;; key ::= buffer
         ;; value ::= edit ...
         ;; edit ::= line old-text new-text result-overlay edit-overlay
-        buffer-alist)
+        all-tran)
     (dolist (x edit-list)
-      (let ((pair (assq (car x) buffer-alist)))
+      (let* ((buffer (car x))
+             (edit (cdr x))
+             (pair (assq buffer all-tran)))
         (unless pair
-          (setq pair (cons (car x) nil))
-          (setq buffer-alist (cons pair buffer-alist)))
-        (setcdr pair (cons (cdr x) (cdr pair)))))
-    (dolist (y buffer-alist)
-      (with-current-buffer (car y)
-        (save-restriction
-          (widen)
-          (dolist (z (cdr y))
-            (wgrep-goto-line (car z))
-            (setcar z (point-marker))))))
-    buffer-alist))
+          (setq pair (cons buffer nil))
+          (setq all-tran (cons pair all-tran)))
+        ;; construct with current settings
+        (setcdr pair (cons edit (cdr pair)))))
+    (dolist (buffer-tran all-tran)
+      (let ((buffer (car buffer-tran))
+            (edit-tran (cdr buffer-tran)))
+        (with-current-buffer (car buffer-tran)
+          (save-restriction
+            (widen)
+            (dolist (edit edit-tran)
+              (let ((linum (car edit)))
+                ;; get a marker
+                (wgrep-goto-line linum)
+                (setcar edit (point-marker))))))))
+    all-tran))
 
 (defun wgrep-commit-buffer (buffer tran)
   (with-current-buffer buffer
-    (let ((inhibit-read-only wgrep-change-readonly-file)
-          done)
-      (wgrep-check-buffer)
-      (wgrep-display-physical-data)
-      (save-restriction
-        (widen)
+    (save-restriction
+      (widen)
+      (let ((inhibit-read-only wgrep-change-readonly-file)
+            done)
+        (wgrep-check-buffer)
+        (wgrep-display-physical-data)
         (dolist (info tran)
           (let ((marker (nth 0 info))
                 (old (nth 1 info))
@@ -961,8 +984,8 @@ is not saved.
               (wgrep-error
                (wgrep-put-reject-face result (cdr err)))
               (error
-               (wgrep-put-reject-face result (prin1-to-string err)))))))
-      (nreverse done))))
+               (wgrep-put-reject-face result (prin1-to-string err))))))
+        (nreverse done)))))
 
 (defun wgrep-finish-edit2 ()
   "Apply changes to file buffers."
@@ -1007,6 +1030,7 @@ is not saved.
      (new
       (wgrep-replace-to-new-line new))
      (t
+      ;;TODO suppress popup
       ;; new nil means flush whole line.
       (wgrep-flush-pop-deleting-line)))))
 

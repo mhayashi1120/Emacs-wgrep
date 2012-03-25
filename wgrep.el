@@ -235,10 +235,11 @@ a file."
   (goto-char (overlay-start ov))
   (forward-line 0)
   (when (looking-at wgrep-line-file-regexp)
-    (let ((name (match-string-no-properties 1))
-          (line (match-string-no-properties 3))
-          (start (match-end 0))
-          result)
+    (let* ((name (match-string-no-properties 1))
+           (line (match-string-no-properties 3))
+           (start (match-end 0))
+           (file (expand-file-name name default-directory))
+           result)
       ;; get a result overlay. (that is not a changed overlay)
       (catch 'done
         (dolist (o (overlays-in (overlay-start ov) (overlay-end ov)))
@@ -246,7 +247,7 @@ a file."
             (setq result o)))
         (setq result (wgrep-make-overlay start (overlay-end ov)))
         (overlay-put result 'wgrep-result t))
-      (list (expand-file-name name default-directory)
+      (list (wgrep-get-file-buffer file)
             (string-to-number line)
             result))))
 
@@ -431,10 +432,9 @@ a file."
       ;; ignore non grep result line.
       t)
      (t
-      (let* ((file (nth 0 info))
+      (let* ((buffer (nth 0 info))
              (line (nth 1 info))
              (result (nth 2 info))
-             (buffer (wgrep-get-file-buffer file))
              (old (overlay-get ov 'wgrep-old-text))
              (new (overlay-get ov 'wgrep-edit-text)))
         (condition-case err
@@ -814,6 +814,90 @@ is not saved.
       (error
        (wgrep-put-reject-face ov (prin1-to-string err))
        nil))))
+
+;;;
+;;; TODO testing
+;;;
+
+(defun wgrep-undo-all-buffers ()
+  "Undo buffers wgrep has changed."
+  (interactive)
+  (let ((count 0))
+    (dolist (b (buffer-list))
+      (with-current-buffer b
+        (when (and (local-variable-p 'wgrep-file-overlays)
+                   wgrep-file-overlays
+                   (buffer-modified-p))
+          ;;TODO undo only wgrep modification..
+          (undo)
+          (setq count (1+ count)))))
+    (cond
+     ((= count 0)
+      (message "Undo no buffer."))
+     ((= count 1)
+      (message "Undo a buffer."))
+     (t
+      (message "Undo %d buffers." count)))))
+
+(defun wgrep-map (function)
+  (save-excursion
+    (let (start end)
+      (wgrep-goto-first-found)
+      (setq start (point))
+      (wgrep-goto-end-of-found)
+      (setq end (point))
+      (save-restriction
+        (narrow-to-region start end)
+        (goto-char (point-min))
+        (while (not (eobp))
+          (when (looking-at wgrep-line-file-regexp)
+            (let* ((file (match-string-no-properties 1))
+                   (buffer (wgrep-get-file-buffer file))
+                   markers diff)
+              (with-current-buffer buffer
+                (setq markers (wgrep-map-line-markers))
+                (save-excursion
+                  (save-match-data
+                    (funcall function)))
+                (setq diff (wgrep-map-line-diff markers)))
+              (wgrep-map-after-call file diff)
+              (with-current-buffer wgrep-each-other-buffer
+                (wgrep-map-after-call file diff))))
+          (forward-line 1))))))
+
+;;TODO not tested yet.
+(defun wgrep-map-after-call (file diff)
+  (let ((inhibit-read-only t)
+        (file-regexp (regexp-quote file))
+        after-change-functions)
+    (save-excursion
+      (dolist (pair diff)
+        (let ((old (car pair))
+              (new (cdr pair)))
+          (goto-char (point-min))
+          (when (re-search-forward (format "^%s:\\(%d\\):" file-regexp old) nil t)
+            (replace-match (number-to-string new) nil nil nil 1)))))))
+
+(defun wgrep-map-line-markers ()
+  (let (markers)
+    (save-excursion
+      (goto-char (point-min))
+      (while (not (eobp))
+        (setq markers (cons (point-marker) markers))
+        (forward-line 1)))
+    (nreverse markers)))
+
+;;TODO deleted line.
+(defun wgrep-map-line-diff (markers)
+  (let ((num 1)
+        (ret '()))
+    (dolist (marker markers)
+      (let ((new (line-number-at-pos (marker-position marker))))
+        (when (/= new num)
+          (setq ret (cons (cons num new) ret))))
+      (setq num (1+ num)))
+    (nreverse ret)))
+
 
 ;;;
 ;;; activate/deactivate marmalade install or github install.

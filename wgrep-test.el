@@ -13,7 +13,7 @@
       (insert-file-contents file)
       (buffer-string))))
 
-(defun wgrep-test--file (file contents &optional cs)
+(defun wgrep-test--prepare (file contents &optional cs)
   ;; cleanup for convinience
   (let ((buf (get-file-buffer file)))
     (kill-buffer buf))
@@ -22,7 +22,7 @@
 
 (ert-deftest wgrep-normal ()
   :tags '(wgrep)
-  (wgrep-test--file "test-data.txt" "HOGE\nFOO\nBAZ\n")
+  (wgrep-test--prepare "test-data.txt" "HOGE\nFOO\nBAZ\n")
   (wgrep-test--grep "grep -nH -e FOO -C 1 test-data.txt")
   (wgrep-change-to-wgrep-mode)
   (goto-char (point-min))
@@ -49,7 +49,7 @@
 
 (ert-deftest wgrep-bom-with-multibyte ()
   :tags '(wgrep)
-  (wgrep-test--file "test-data.txt" "あ\nい\nう\n" 'utf-8-with-signature)
+  (wgrep-test--prepare "test-data.txt" "あ\nい\nう\n" 'utf-8-with-signature)
   (wgrep-test--grep "grep -nH -e 'あ' -A 2 test-data.txt")
   (wgrep-change-to-wgrep-mode)
   (goto-char (point-min))
@@ -69,7 +69,7 @@
 
 (ert-deftest wgrep-bom-with-unibyte ()
   :tags '(wgrep)
-  (wgrep-test--file "test-data.txt" "a\nb\n" 'utf-8-with-signature)
+  (wgrep-test--prepare "test-data.txt" "a\nb\n" 'utf-8-with-signature)
   (wgrep-test--grep "grep -nH -e 'a' -A 2 test-data.txt")
   (wgrep-change-to-wgrep-mode)
   (goto-char (point-min))
@@ -86,7 +86,7 @@
 
 (ert-deftest wgrep-with-modify ()
   :tags '(wgrep)
-  (wgrep-test--file "test-data.txt" "a\nb\nc\n")
+  (wgrep-test--prepare "test-data.txt" "a\nb\nc\n")
   (with-current-buffer (find-file-noselect "test-data.txt")
     ;; modify file buffer
     (goto-char (point-min))
@@ -97,10 +97,13 @@
   (wgrep-test--grep "grep -nH -e 'a' -A 2 test-data.txt")
   (wgrep-change-to-wgrep-mode)
   (goto-char (point-min))
+  ;; delete "a" line (failed when saving)
   (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(a\\)$" nil t))
   (wgrep-flush-current-line)
+  ;; replace "b" line (failed when saving)
   (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(b\\)$" nil t))
   (replace-match "B" nil nil nil 1)
+  ;; replace "c" line
   (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(c\\)$" nil t))
   (replace-match "C" nil nil nil 1)
   ;; apply to buffer

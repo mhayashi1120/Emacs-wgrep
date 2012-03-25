@@ -898,6 +898,34 @@ is not saved.
       (setq num (1+ num)))
     (nreverse ret)))
 
+(defun wgrep-editing-result ()
+  (let (info res)
+    (dolist (ov wgrep-overlays res)
+      (cond
+        ;; ignore removed line or removed overlay
+       ((eq (overlay-start ov) (overlay-end ov)))
+       ;; ignore non grep result line.
+       ((null (setq info (wgrep-get-edit-info ov))))
+       (t
+        (let* ((buffer (nth 0 info))
+               (line (nth 1 info))
+               (result (nth 2 info))
+               (old (overlay-get ov 'wgrep-old-text))
+               (new (overlay-get ov 'wgrep-edit-text)))
+          (setq res
+                (cons
+                 (list buffer line result old new)
+                 res))))))))
+
+(defun wgrep-calculate-transaction ()
+  (let ((editing (wgrep-editing-result))
+        res)
+    (dolist (x editing res)
+      (let ((pair (assq (car x) res)))
+        (unless pair
+          (setq pair (cons (car x) nil))
+          (setq res (cons pair res)))
+        (setcdr pair (cons (cdr x) (cdr pair)))))))
 
 ;;;
 ;;; activate/deactivate marmalade install or github install.

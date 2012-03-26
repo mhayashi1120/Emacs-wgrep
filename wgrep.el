@@ -231,26 +231,6 @@ a file."
    (t
     (wgrep-put-change-face beg end))))
 
-(defun wgrep-get-edit-info (ov)
-  (goto-char (overlay-start ov))
-  (forward-line 0)
-  (when (looking-at wgrep-line-file-regexp)
-    (let* ((name (match-string-no-properties 1))
-           (line (match-string-no-properties 3))
-           (start (match-end 0))
-           (file (expand-file-name name default-directory))
-           result)
-      ;; get a result overlay. (that is not a changed overlay)
-      (catch 'done
-        (dolist (o (overlays-in (overlay-start ov) (overlay-end ov)))
-          (when (overlay-get o 'wgrep-result)
-            (setq result o)))
-        (setq result (wgrep-make-overlay start (overlay-end ov)))
-        (overlay-put result 'wgrep-result t))
-      (list (wgrep-get-file-buffer file)
-            (string-to-number line)
-            result))))
-
 (defun wgrep-get-flush-overlay ()
   (catch 'done
     ;; get existing overlay
@@ -291,34 +271,6 @@ a file."
   (dolist (ov wgrep-file-overlays)
     (delete-overlay ov))
   (kill-local-variable 'wgrep-file-overlays))
-
-(defun wgrep-apply-to-buffer (buffer old line &optional new)
-  "*The changes in the grep buffer are applied to the file"
-  (with-current-buffer buffer
-    (let ((inhibit-read-only wgrep-change-readonly-file)
-          (coding buffer-file-coding-system))
-      (wgrep-check-buffer)
-      (wgrep-display-physical-data)
-      (save-restriction
-        (widen)
-        (wgrep-goto-line line)
-        ;;FIXME simply do this?
-        (when (and (= line 1)
-                   coding
-                   (coding-system-get coding :bom))
-          (setq old (wgrep-string-replace-bom old coding))
-          (when new
-            (setq new (wgrep-string-replace-bom new coding))))
-        (unless (string= old
-                         (buffer-substring
-                          (line-beginning-position) (line-end-position)))
-          (signal 'wgrep-error "Buffer was changed after grep."))
-        (cond
-         (new
-          (wgrep-replace-to-new-line new))
-         (t
-          ;; new nil means flush whole line.
-          (wgrep-flush-pop-deleting-line)))))))
 
 (defun wgrep-replace-to-new-line (new-text)
   ;; delete grep extracted region (restricted to a line)
@@ -776,8 +728,14 @@ is not saved.
   (let* ((file (expand-file-name filename default-directory))
          (buffer (wgrep-get-file-buffer file)))
     (condition-case err
-        (progn
-          (wgrep-apply-to-buffer buffer old line)
+        (with-current-buffer buffer
+          (save-restriction
+            (widen)
+            (wgrep-check-buffer)
+            (wgrep-display-physical-data)
+            (let ((inhibit-read-only wgrep-change-readonly-file))
+              (wgrep-goto-line line)
+              (wgrep-flush-pop-deleting-line)))
           t)
       (wgrep-error
        (wgrep-put-reject-face ov (cdr err))
@@ -786,16 +744,17 @@ is not saved.
        (wgrep-put-reject-face ov (prin1-to-string err))
        nil))))
 
+;; return alist like following
+;; key ::= buffer
+;; value ::= linum old-text new-text result-overlay edit-overlay
 (defun wgrep-transaction-editing-list ()
-  (let (info res)
+  (let (res)
     (dolist (ov wgrep-overlays)
       (goto-char (overlay-start ov))
       (forward-line 0)
       (cond
        ;; ignore removed line or removed overlay
        ((eq (overlay-start ov) (overlay-end ov)))
-       ;; ignore non grep result line.
-       ((null (setq info (wgrep-get-edit-info ov))))
        ((looking-at wgrep-line-file-regexp)
         (let* ((name (match-string-no-properties 1))
                (line (match-string-no-properties 3))
@@ -824,8 +783,8 @@ is not saved.
 (defun wgrep-calculate-transaction ()
   (let ((edit-list (wgrep-transaction-editing-list))
         ;; key ::= buffer
-        ;; value ::= edit ...
-        ;; edit ::= line old-text new-text result-overlay edit-overlay
+        ;; value ::= edit [edit ...]
+        ;; edit ::= linum old-text new-text result-overlay edit-overlay
         all-tran)
     (dolist (x edit-list)
       (let* ((buffer (car x))
@@ -836,10 +795,12 @@ is not saved.
           (setq all-tran (cons pair all-tran)))
         ;; construct with current settings
         (setcdr pair (cons edit (cdr pair)))))
+    ;; Convert linum to marker.
+    ;; When new text contains newline destroy linum access.
     (dolist (buffer-tran all-tran)
       (let ((buffer (car buffer-tran))
             (edit-tran (cdr buffer-tran)))
-        (with-current-buffer (car buffer-tran)
+        (with-current-buffer buffer
           (save-restriction
             (widen)
             (dolist (edit edit-tran)
@@ -853,10 +814,10 @@ is not saved.
   (with-current-buffer buffer
     (save-restriction
       (widen)
+      (wgrep-check-buffer)
+      (wgrep-display-physical-data)
       (let ((inhibit-read-only wgrep-change-readonly-file)
             done)
-        (wgrep-check-buffer)
-        (wgrep-display-physical-data)
         (dolist (info tran)
           (let ((marker (nth 0 info))
                 (old (nth 1 info))
@@ -875,10 +836,12 @@ is not saved.
                (wgrep-put-reject-face result (prin1-to-string err))))))
         (nreverse done)))))
 
-(defun wgrep-apply-change (marker old &optional new)
+;;TODO new may be nil colorize deleting whole line
+(defun wgrep-apply-change (marker old new)
   "*The changes in the grep buffer are applied to the file"
   (let ((coding buffer-file-coding-system))
     (goto-char marker)
+    ;; check BOM
     (when (and (= (point-min-marker) marker)
                coding
                (coding-system-get coding :bom))

@@ -42,7 +42,6 @@
 ;; C-c C-e : Apply the changes to file buffers.
 ;; C-c C-u : All changes are unmarked and ignored.
 ;; C-c C-d : Delete current line (including newline).
-;;           This is immediately reflected in the file's buffer.
 ;; C-c C-r : Remove the changes in the region (these changes are not
 ;;           applied to the files. Of course, the remaining
 ;;           changes can still be applied to the files.)
@@ -172,24 +171,23 @@ a file."
 
 (defvar wgrep-mode-map nil)
 (unless wgrep-mode-map
-  (setq wgrep-mode-map
-        (let ((map (make-sparse-keymap)))
+  (let ((map (make-sparse-keymap)))
 
-          (define-key map "\C-c\C-c" 'wgrep-finish-edit)
-          (define-key map "\C-c\C-d" 'wgrep-flush-current-line)
-          (define-key map "\C-c\C-e" 'wgrep-finish-edit)
-          (define-key map "\C-c\C-p" 'wgrep-toggle-readonly-area)
-          (define-key map "\C-c\C-r" 'wgrep-remove-change)
-          (define-key map "\C-x\C-s" 'wgrep-finish-edit)
-          (define-key map "\C-c\C-u" 'wgrep-remove-all-change)
-          (define-key map "\C-c\C-[" 'wgrep-remove-all-change)
-          (define-key map "\C-c\C-k" 'wgrep-abort-changes)
-          (define-key map "\C-x\C-q" 'wgrep-exit)
-          (define-key map "\C-m"     'ignore)
-          (define-key map "\C-j"     'ignore)
-          (define-key map "\C-o"     'ignore)
+    (define-key map "\C-c\C-c" 'wgrep-finish-edit)
+    (define-key map "\C-c\C-d" 'wgrep-mark-deletion)
+    (define-key map "\C-c\C-e" 'wgrep-finish-edit)
+    (define-key map "\C-c\C-p" 'wgrep-toggle-readonly-area)
+    (define-key map "\C-c\C-r" 'wgrep-remove-change)
+    (define-key map "\C-x\C-s" 'wgrep-finish-edit)
+    (define-key map "\C-c\C-u" 'wgrep-remove-all-change)
+    (define-key map "\C-c\C-[" 'wgrep-remove-all-change)
+    (define-key map "\C-c\C-k" 'wgrep-abort-changes)
+    (define-key map "\C-x\C-q" 'wgrep-exit)
+    (define-key map "\C-m"     'ignore)
+    (define-key map "\C-j"     'ignore)
+    (define-key map "\C-o"     'ignore)
 
-          map)))
+    (setq wgrep-mode-map map)))
 
 ;;;###autoload
 (defun wgrep-setup ()
@@ -526,70 +524,23 @@ or \\[wgrep-abort-changes] to abort changes.")))
      (t
       (message "%d buffers have been saved." count)))))
 
-(defun wgrep-mark-flagged-deletion ()
+(defun wgrep-mark-deletion ()
   "TODO"
   (interactive)
   (save-excursion
     (let ((ov (wgrep-editing-overlay)))
       (unless ov
         (error "Not a grep result"))
-      (overlay-put ov 'wgrep-edit-text nil)
-      (let ((wgrep-inhibit-modification-hook t)
-            (begin (overlay-get ov 'wgrep-contents-begin))
-            (end (overlay-end ov)))
-        (delete-region begin end)
-        (wgrep-register-edit-overlay ov)))))
-
-(defun wgrep-flush-current-line ()
-  "Flush current line and file buffer. Undo is disabled for this command.
-This command immediately changes the file buffer, although the buffer
-is not saved.
-"
-  (interactive)
-  (save-excursion
-    (let ((inhibit-read-only t))
-      (forward-line 0)
-      (unless (looking-at wgrep-line-file-regexp)
-        (error "Not a grep result"))
-      (let* ((header (match-string-no-properties 0))
-             (filename (match-string-no-properties 1))
-             (line (string-to-number (match-string 3)))
-             (ov (wgrep-get-flush-overlay))
-             (old (wgrep-get-old-text header)))
-        (let ((inhibit-quit t)
-              (wgrep-inhibit-modification-hook t))
-          (when (wgrep-flush-apply-to-buffer filename ov line old)
-            (delete-overlay ov)
-            ;; disable undo temporarily and change *grep* buffer.
-            (let ((buffer-undo-list t))
-              (wgrep-delete-whole-line)
-              (wgrep-after-delete-line filename line))
-            ;; correct evacuated buffer
-            (with-current-buffer wgrep-each-other-buffer
-              (let ((inhibit-read-only t))
-                (wgrep-after-delete-line filename line)))))))))
-
-(defun wgrep-after-delete-line (filename delete-line)
-  (save-excursion
-    (wgrep-goto-first-found)
-    (let ((regexp (format "^%s\\(?::\\)\\([0-9]+\\)\\(?::\\)"
-                          (regexp-quote filename))))
-      (while (not (eobp))
-        (when (looking-at regexp)
-          (let ((line (string-to-number (match-string 1)))
-                (read-only (get-text-property (point) 'read-only)))
-            (cond
-             ((= line delete-line)
-              ;; for cloned buffer (flush same line number)
-              (wgrep-delete-whole-line)
-              (forward-line -1))
-             ((> line delete-line)
-              ;; down line number
-              (let ((line-head (format "%s:%d:" filename (1- line))))
-                (wgrep-set-readonly-property
-                 0 (length line-head) read-only line-head)
-                (replace-match line-head nil nil nil 0))))))
-        (forward-line 1)))))
+      (condition-case nil
+          (progn
+            (overlay-put ov 'wgrep-edit-text nil)
+            (let ((wgrep-inhibit-modification-hook t)
+                  (begin (overlay-get ov 'wgrep-contents-begin))
+                  (end (overlay-end ov)))
+              (delete-region begin end)
+              (wgrep-register-edit-overlay ov)))
+        (error
+         (delete-overlay ov))))))
 
 (defun wgrep-prepare-context ()
   (wgrep-goto-first-found)
@@ -610,8 +561,7 @@ is not saved.
     (forward-line 1)))
 
 (defun wgrep-delete-whole-line ()
-  (wgrep-delete-region
-   (line-beginning-position) (line-beginning-position 2)))
+  (delete-region (line-beginning-position) (line-beginning-position 2)))
 
 (defun wgrep-goto-first-found ()
   (goto-char (point-min))
@@ -638,10 +588,6 @@ is not saved.
         (replace-match line-head nil nil nil 0)
         (forward-line diff)
         (setq next (+ diff next))))))
-
-(defun wgrep-delete-region (min max)
-  (remove-text-properties min max '(read-only) (current-buffer))
-  (delete-region min max))
 
 (defun wgrep-process-exited-p ()
   (let ((proc (get-buffer-process (current-buffer))))
@@ -757,35 +703,6 @@ is not saved.
       (goto-char (point-min))
       (when (re-search-forward (concat "^" (regexp-quote header)) nil t)
         (buffer-substring-no-properties (point) (line-end-position))))))
-
-(defun wgrep-flush-pop-deleting-line ()
-  (save-window-excursion
-    (set-window-buffer (selected-window) (current-buffer))
-    (wgrep-put-color-file
-     (line-beginning-position) (line-end-position))
-    (sit-for 0.3)
-    (wgrep-delete-whole-line)
-    (sit-for 0.3)))
-
-(defun wgrep-flush-apply-to-buffer (filename ov line old)
-  (let* ((file (expand-file-name filename default-directory))
-         (buffer (wgrep-get-file-buffer file)))
-    (condition-case err
-        (with-current-buffer buffer
-          (save-restriction
-            (widen)
-            (wgrep-check-buffer)
-            (wgrep-display-physical-data)
-            (let ((inhibit-read-only wgrep-change-readonly-file))
-              (wgrep-goto-line line)
-              (wgrep-flush-pop-deleting-line)))
-          t)
-      (wgrep-error
-       (wgrep-put-reject-face ov (cdr err))
-       nil)
-      (error
-       (wgrep-put-reject-face ov (prin1-to-string err))
-       nil))))
 
 ;; return alist like following
 ;; key ::= buffer
@@ -925,65 +842,6 @@ is not saved.
       (message "Undo a buffer."))
      (t
       (message "Undo %d buffers." count)))))
-
-(defun wgrep-map (function)
-  (save-excursion
-    (let (start end)
-      (wgrep-goto-first-found)
-      (setq start (point))
-      (wgrep-goto-end-of-found)
-      (setq end (point))
-      (save-restriction
-        (narrow-to-region start end)
-        (goto-char (point-min))
-        (while (not (eobp))
-          (when (looking-at wgrep-line-file-regexp)
-            (let* ((file (match-string-no-properties 1))
-                   (buffer (wgrep-get-file-buffer file))
-                   markers diff)
-              (with-current-buffer buffer
-                (setq markers (wgrep-map-line-markers))
-                (save-excursion
-                  (save-match-data
-                    (funcall function)))
-                (setq diff (wgrep-map-line-diff markers)))
-              (wgrep-map-after-call file diff)
-              (with-current-buffer wgrep-each-other-buffer
-                (wgrep-map-after-call file diff))))
-          (forward-line 1))))))
-
-;;TODO not tested yet.
-(defun wgrep-map-after-call (file diff)
-  (let ((inhibit-read-only t)
-        (file-regexp (regexp-quote file))
-        after-change-functions)
-    (save-excursion
-      (dolist (pair diff)
-        (let ((old (car pair))
-              (new (cdr pair)))
-          (goto-char (point-min))
-          (when (re-search-forward (format "^%s:\\(%d\\):" file-regexp old) nil t)
-            (replace-match (number-to-string new) nil nil nil 1)))))))
-
-(defun wgrep-map-line-markers ()
-  (let (markers)
-    (save-excursion
-      (goto-char (point-min))
-      (while (not (eobp))
-        (setq markers (cons (point-marker) markers))
-        (forward-line 1)))
-    (nreverse markers)))
-
-;;TODO deleted line.
-(defun wgrep-map-line-diff (markers)
-  (let ((num 1)
-        (ret '()))
-    (dolist (marker markers)
-      (let ((new (line-number-at-pos (marker-position marker))))
-        (when (/= new num)
-          (setq ret (cons (cons num new) ret))))
-      (setq num (1+ num)))
-    (nreverse ret)))
 
 ;;;
 ;;; activate/deactivate marmalade install or github install.

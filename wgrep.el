@@ -250,13 +250,13 @@ a file."
     (wgrep-make-overlay (line-beginning-position) (line-end-position))))
 
 (put 'wgrep-error 'error-conditions '(wgrep-error error))
-(put 'wgrep-error 'error-message "Error while applying changes.")
+(put 'wgrep-error 'error-message "wgrep error")
 
 (defun wgrep-get-file-buffer (file)
   (unless (file-exists-p file)
-    (signal 'wgrep-error "File does not exist."))
+    (signal 'wgrep-error (list "File does not exist.")))
   (unless (file-writable-p file)
-    (signal 'wgrep-error "File is not writable."))
+    (signal 'wgrep-error (list "File is not writable.")))
   (or (get-file-buffer file)
       (find-file-noselect file)))
 
@@ -264,7 +264,8 @@ a file."
   "Check the file's status. If it is possible to change the file, return t"
   (when (and (not wgrep-change-readonly-file)
              buffer-read-only)
-    (signal 'wgrep-error (format "Buffer \"%s\" is read-only." (buffer-name)))))
+    (signal 'wgrep-error
+            (list (format "Buffer \"%s\" is read-only." (buffer-name))))))
 
 (defun wgrep-display-physical-data ()
   (cond
@@ -318,16 +319,19 @@ a file."
   (let ((ov (wgrep-make-overlay beg end)))
     (overlay-put ov 'face 'wgrep-file-face)
     (overlay-put ov 'priority 0)
+    (overlay-put ov 'modification-hooks
+                 `((lambda (&rest args) (delete-overlay ,ov))))
     (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)
     (setq wgrep-file-overlays (cons ov wgrep-file-overlays))))
 
-(defun wgrep-put-done-face (ov)
-  (wgrep-set-face ov 'wgrep-done-face))
+(defun wgrep-put-done-result (ov)
+  (wgrep-set-result ov 'wgrep-done-face))
 
-(defun wgrep-put-reject-face (ov message)
-  (wgrep-set-face ov 'wgrep-reject-face message))
+(defun wgrep-put-reject-result (ov error-data)
+  (let ((message (mapconcat (lambda (x) (format "%s" x)) error-data " ")))
+    (wgrep-set-result ov 'wgrep-reject-face message)))
 
-(defun wgrep-set-face (ov face &optional message)
+(defun wgrep-set-result (ov face &optional message)
   (overlay-put ov 'face face)
   (overlay-put ov 'priority 1)
   (overlay-put ov 'wgrep-reject-message message))
@@ -744,7 +748,8 @@ This change will be applied when `wgrep-finish-edit' is succeeded."
             (dolist (o (overlays-in (overlay-start ov) (overlay-end ov)))
               (when (overlay-get o 'wgrep-result)
                 ;; get existing overlay
-                (setq result o)))
+                (setq result o)
+                (throw 'done t)))
             ;; create overlay to show result of committing
             (setq result (wgrep-make-overlay start (overlay-end ov)))
             (overlay-put result 'wgrep-result t))
@@ -788,7 +793,6 @@ This change will be applied when `wgrep-finish-edit' is succeeded."
   (with-current-buffer buffer
     (save-restriction
       (widen)
-      (wgrep-check-buffer)
       (wgrep-display-physical-data)
       (let ((inhibit-read-only wgrep-change-readonly-file)
             done)
@@ -800,14 +804,13 @@ This change will be applied when `wgrep-finish-edit' is succeeded."
                 (ov (nth 4 info)))
             (condition-case err
                 (progn
+                  (wgrep-check-buffer)
                   (wgrep-apply-change marker old new)
-                  (wgrep-put-done-face result)
+                  (wgrep-put-done-result result)
                   (delete-overlay ov)
                   (setq done (cons ov done)))
-              (wgrep-error
-               (wgrep-put-reject-face result (cdr err)))
               (error
-               (wgrep-put-reject-face result (prin1-to-string err))))))
+               (wgrep-put-reject-result result (cdr err))))))
         (nreverse done)))))
 
 (defun wgrep-apply-change (marker old new)
@@ -826,7 +829,7 @@ NEW may be nil this means deleting whole line."
     (unless (string= old
                      (buffer-substring
                       (line-beginning-position) (line-end-position)))
-      (signal 'wgrep-error "Buffer was changed after grep."))
+      (signal 'wgrep-error (list "Buffer was changed after grep.")))
     (cond
      (new
       (wgrep-replace-to-new-line new))

@@ -316,11 +316,21 @@ a file."
 
 (defun wgrep-put-color-file (beg end)
   "*Highlight the changes in the file"
-  (let ((ov (wgrep-make-overlay beg end)))
+  (let ((ov
+         (catch 'done
+           (dolist (o (overlays-in beg end))
+             (when (overlay-get o 'wgrep)
+               (move-overlay o beg end)
+               (throw 'done o)))
+           (wgrep-make-overlay beg end))))
     (overlay-put ov 'face 'wgrep-file-face)
     (overlay-put ov 'priority 0)
     (overlay-put ov 'modification-hooks
-                 `((lambda (&rest args) (delete-overlay ,ov))))
+                 ;; remove the overlay if modify the changed text
+                 `((lambda (&rest args)
+                     (setq wgrep-file-overlays
+                           (delq ,ov wgrep-file-overlays))
+                     (delete-overlay ,ov))))
     (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)
     (setq wgrep-file-overlays (cons ov wgrep-file-overlays))))
 
@@ -836,31 +846,6 @@ NEW may be nil this means deleting whole line."
      (t
       ;; new nil means flush whole line.
       (wgrep-flush-whole-line)))))
-
-;;;
-;;; TODO testing
-;;;
-
-(defun wgrep-undo-all-buffers ()
-  "Undo buffers wgrep has changed."
-  (interactive)
-  (let ((count 0))
-    (dolist (b (buffer-list))
-      (with-current-buffer b
-        (when (and (local-variable-p 'wgrep-file-overlays)
-                   wgrep-file-overlays
-                   (buffer-modified-p))
-          ;;TODO undo only wgrep modification..
-          (undo)
-          (setq count (1+ count)))
-        (kill-local-variable 'wgrep-file-overlays)))
-    (cond
-     ((= count 0)
-      (message "Undo no buffer."))
-     ((= count 1)
-      (message "Undo a buffer."))
-     (t
-      (message "Undo %d buffers." count)))))
 
 ;;;
 ;;; activate/deactivate marmalade install or github install.

@@ -18,7 +18,7 @@ The following keybindings are defined:
 
 * `C-c C-e`: Apply the changes to file buffers.
 * `C-c C-u`: All changes are unmarked and ignored.
-* `C-c C-d`: Delete current line (including newline).
+* `C-c C-d`: Mark as delete to current line (including newline).
 * `C-c C-r`: Remove the changes in the region (these changes are not applied to the files. Of course, the remaining changes can still be applied to the files.)
 * `C-c C-p`: Toggle read-only area.
 * `C-c C-k`: Discard all changes and exit.

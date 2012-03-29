@@ -41,7 +41,7 @@
 
 ;; C-c C-e : Apply the changes to file buffers.
 ;; C-c C-u : All changes are unmarked and ignored.
-;; C-c C-d : Delete current line (including newline).
+;; C-c C-d : Mark as delete to current line (including newline).
 ;; C-c C-r : Remove the changes in the region (these changes are not
 ;;           applied to the files. Of course, the remaining
 ;;           changes can still be applied to the files.)
@@ -111,6 +111,18 @@
     (t
      ()))
   "*Face used for the changed text in the grep buffer."
+  :group 'wgrep)
+
+(defface wgrep-delete-face
+  '((((class color)
+      (background dark))
+     (:background "SlateGray1" :weight bold :foreground "pink"))
+    (((class color)
+      (background light))
+     (:background "ForestGreen" :weight bold :foreground "pink"))
+    (t
+     ()))
+  "*Face used for the deleted whole line in the grep buffer."
   :group 'wgrep)
 
 (defface wgrep-file-face
@@ -339,6 +351,7 @@ a file."
           (setq wgrep-overlays (remq ov wgrep-overlays))
           (delete-overlay ov))
          (t
+          (overlay-put ov 'face 'wgrep-face)
           (wgrep-register-edit-overlay ov)))))))
 
 ;; get overlay BEG and END is passed by `after-change-functions'
@@ -383,7 +396,6 @@ a file."
             (overlay-put ov 'wgrep-filename filename)
             (overlay-put ov 'wgrep-linum linum)
             (overlay-put ov 'wgrep-changed t)
-            (overlay-put ov 'face 'wgrep-face)
             (overlay-put ov 'priority 0)
             (overlay-put ov 'wgrep-old-text old)))
          (t
@@ -525,7 +537,8 @@ or \\[wgrep-abort-changes] to abort changes.")))
       (message "%d buffers have been saved." count)))))
 
 (defun wgrep-mark-deletion ()
-  "TODO"
+  "Mark as delete to current line.
+This change will be applied when `wgrep-finish-edit' is succeeded."
   (interactive)
   (save-excursion
     (let ((ov (wgrep-editing-overlay)))
@@ -538,6 +551,7 @@ or \\[wgrep-abort-changes] to abort changes.")))
                   (begin (overlay-get ov 'wgrep-contents-begin))
                   (end (overlay-end ov)))
               (delete-region begin end)
+              (overlay-put ov 'face 'wgrep-delete-face)
               (wgrep-register-edit-overlay ov)))
         (error
          (delete-overlay ov))))))

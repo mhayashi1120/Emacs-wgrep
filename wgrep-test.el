@@ -32,7 +32,7 @@
   ;; search hit line (hit by -C option)
   (should (re-search-forward "HOGE" nil t))
   ;; delete 1st line
-  (wgrep-flush-current-line)
+  (wgrep-mark-deletion)
   (should (re-search-forward "FOO" nil t))
   ;; replace 2nd line
   (replace-match "FOO2")
@@ -99,7 +99,7 @@
   (goto-char (point-min))
   ;; delete "a" line (failed when saving)
   (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(a\\)$" nil t))
-  (wgrep-flush-current-line)
+  (wgrep-mark-deletion)
   ;; replace "b" line (failed when saving)
   (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(b\\)$" nil t))
   (replace-match "B" nil nil nil 1)

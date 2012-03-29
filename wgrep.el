@@ -416,7 +416,7 @@ a file."
 (defun wgrep-finish-edit ()
   "Apply changes to file buffers."
   (interactive)
-  (let ((all-tran (wgrep-calculate-transaction))
+  (let ((all-tran (wgrep-compute-transaction))
         done)
     (dolist (buf-tran all-tran)
       (let ((commited (wgrep-commit-buffer (car buf-tran) (cdr buf-tran))))
@@ -754,7 +754,7 @@ This change will be applied when `wgrep-finish-edit' is succeeded."
                  res))))))
     (nreverse res)))
 
-(defun wgrep-calculate-transaction ()
+(defun wgrep-compute-transaction ()
   (let ((edit-list (wgrep-transaction-editing-list))
         ;; key ::= buffer
         ;; value ::= edit [edit ...]
@@ -810,9 +810,9 @@ This change will be applied when `wgrep-finish-edit' is succeeded."
                (wgrep-put-reject-face result (prin1-to-string err))))))
         (nreverse done)))))
 
-;;TODO new may be nil colorize deleting whole line
 (defun wgrep-apply-change (marker old new)
-  "*The changes in the grep buffer are applied to the file"
+  "The changes in the *grep* buffer are applied to the file.
+NEW may be nil this means deleting whole line."
   (let ((coding buffer-file-coding-system))
     (goto-char marker)
     ;; check BOM
@@ -822,6 +822,7 @@ This change will be applied when `wgrep-finish-edit' is succeeded."
       (setq old (wgrep-string-replace-bom old coding))
       (when new
         (setq new (wgrep-string-replace-bom new coding))))
+    ;; Check buffer line was modified after execute grep.
     (unless (string= old
                      (buffer-substring
                       (line-beginning-position) (line-end-position)))
@@ -848,7 +849,8 @@ This change will be applied when `wgrep-finish-edit' is succeeded."
                    (buffer-modified-p))
           ;;TODO undo only wgrep modification..
           (undo)
-          (setq count (1+ count)))))
+          (setq count (1+ count)))
+        (kill-local-variable 'wgrep-file-overlays)))
     (cond
      ((= count 0)
       (message "Undo no buffer."))

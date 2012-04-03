@@ -53,6 +53,10 @@
 ;;
 ;;   M-x wgrep-save-all-buffers
 
+;; * To save buffer automatically when `wgrep-finish-edit'.
+;;
+;; (setq wgrep-auto-save-buffer t)
+
 ;; * You can change the default key binding to switch to wgrep.
 ;;
 ;; (setq wgrep-enable-key "r")
@@ -89,14 +93,19 @@
   :group 'grep)
 
 (defcustom wgrep-change-readonly-file nil
-  "*Non-nil means to enable change read-only files."
+  "Non-nil means to enable change read-only files."
   :group 'wgrep
   :type 'boolean)
 
 (defcustom wgrep-enable-key "\C-c\C-p"
-  "*Key to enable `wgrep-mode'."
-  :type 'string
-  :group 'wgrep)
+  "Key to enable `wgrep-mode'."
+  :group 'wgrep
+  :type 'string)
+
+(defcustom wgrep-auto-save-buffer nil
+  "Non-nil means do `save-buffer' automatically while `wgrep-finish-edit'."
+  :group 'wgrep
+  :type 'boolean)
 
 (defvar wgrep-setup-hook nil
   "Hooks to run when setting up wgrep.")
@@ -195,9 +204,6 @@ a file."
     (define-key map "\C-c\C-[" 'wgrep-remove-all-change)
     (define-key map "\C-c\C-k" 'wgrep-abort-changes)
     (define-key map "\C-x\C-q" 'wgrep-exit)
-    (define-key map "\C-m"     'ignore)
-    (define-key map "\C-j"     'ignore)
-    (define-key map "\C-o"     'ignore)
 
     (setq wgrep-mode-map map)))
 
@@ -241,14 +247,6 @@ a file."
    (t
     (wgrep-put-change-face beg end))))
 
-(defun wgrep-get-flush-overlay ()
-  (catch 'done
-    ;; get existing overlay
-    (dolist (o (overlays-in (line-beginning-position) (line-end-position)))
-      (when (overlay-get o 'wgrep)
-        (throw 'done o)))
-    (wgrep-make-overlay (line-beginning-position) (line-end-position))))
-
 (put 'wgrep-error 'error-conditions '(wgrep-error error))
 (put 'wgrep-error 'error-message "wgrep error")
 
@@ -276,7 +274,16 @@ a file."
       (image-mode-as-text)))
    (t nil)))
 
-;; not consider other edit. (ex: Undo or self-insert-command)
+(defun wgrep-let-destructive-overlay (ov)
+  (dolist (prop '(modification-hooks insert-in-front-hooks insert-behind-hooks))
+    (overlay-put
+     ov prop
+     `((lambda (ov after-p &rest ignore)
+         (when after-p
+           (setq wgrep-file-overlays
+                 (delq ov wgrep-file-overlays))
+           (delete-overlay ov)))))))
+
 (defun wgrep-after-save-hook ()
   (remove-hook 'after-save-hook 'wgrep-after-save-hook t)
   (dolist (ov wgrep-file-overlays)
@@ -303,7 +310,7 @@ a file."
   (let ((regexp (car (rassq (coding-system-base cs) auto-coding-regexp-alist)))
         ;; FIXME: `find-operation-coding-system' is not exactly correct.
         ;;        However almost case is ok like this bom function.
-        ;;        ex: (let ((default-process-coding-system 'some-coding))
+        ;;        e.g. (let ((default-process-coding-system 'some-coding))
         ;;               (call-interactively 'grep))
         (grep-cs (or (find-operation-coding-system 'call-process grep-program)
                      (terminal-coding-system)))
@@ -325,12 +332,7 @@ a file."
            (wgrep-make-overlay beg end))))
     (overlay-put ov 'face 'wgrep-file-face)
     (overlay-put ov 'priority 0)
-    (overlay-put ov 'modification-hooks
-                 ;; remove the overlay if modify the changed text
-                 `((lambda (&rest args)
-                     (setq wgrep-file-overlays
-                           (delq ,ov wgrep-file-overlays))
-                     (delete-overlay ,ov))))
+    (wgrep-let-destructive-overlay ov)
     (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)
     (setq wgrep-file-overlays (cons ov wgrep-file-overlays))))
 
@@ -428,7 +430,9 @@ a file."
   (setq buffer-read-only t))
 
 (defun wgrep-finish-edit ()
-  "Apply changes to file buffers."
+  "Apply changes to file buffers.
+These changes are not immediately saved to disk unless 
+`wgrep-auto-save-buffer' is non-nil."
   (interactive)
   (let ((all-tran (wgrep-compute-transaction))
         done)
@@ -552,7 +556,7 @@ or \\[wgrep-abort-changes] to abort changes.")))
 
 (defun wgrep-mark-deletion ()
   "Mark as delete to current line.
-This change will be applied when `wgrep-finish-edit' is succeeded."
+This change will be applied when \\[wgrep-finish-edit]."
   (interactive)
   (save-excursion
     (let ((ov (wgrep-editing-overlay)))
@@ -606,7 +610,7 @@ This change will be applied when `wgrep-finish-edit' is succeeded."
   (forward-line (1- line)))
 
 ;; -A -B -C output may be misunderstood and set read-only.
-;; (ex: filename-20-2010/01/01 23:59:99)
+;; (e.g. filename-20-2010/01/01 23:59:99)
 (defun wgrep-prepare-context-while (filename line forward)
   (let* ((diff (if forward 1 -1))
          (next (+ diff line)))
@@ -800,6 +804,8 @@ This change will be applied when `wgrep-finish-edit' is succeeded."
     all-tran))
 
 (defun wgrep-commit-buffer (buffer tran)
+  ;; Apply TRAN to BUFFER.
+  ;; See `wgrep-compute-transaction'
   (with-current-buffer buffer
     (save-restriction
       (widen)
@@ -814,6 +820,8 @@ This change will be applied when `wgrep-finish-edit' is succeeded."
                 (ov (nth 4 info)))
             (condition-case err
                 (progn
+                  ;; check the buffer while each of overlays
+                  ;; to set a result message.
                   (wgrep-check-buffer)
                   (wgrep-apply-change marker old new)
                   (wgrep-put-done-result result)
@@ -821,6 +829,8 @@ This change will be applied when `wgrep-finish-edit' is succeeded."
                   (setq done (cons ov done)))
               (error
                (wgrep-put-reject-result result (cdr err))))))
+        (when (and wgrep-auto-save-buffer done)
+          (basic-save-buffer))
         (nreverse done)))))
 
 (defun wgrep-apply-change (marker old new)

@@ -28,6 +28,10 @@ To save all buffers that wgrep has changed, run
 
     M-x wgrep-save-all-buffers
 
+To save buffer automatically when `wgrep-finish-edit'.
+
+    (setq wgrep-auto-save-buffer t)
+
 You can change the default key binding to switch to wgrep.
 
     (setq wgrep-enable-key "r")

@@ -431,7 +431,7 @@ a file."
 
 (defun wgrep-finish-edit ()
   "Apply changes to file buffers.
-These changes are not immediately saved to disk unless 
+These changes are not immediately saved to disk unless
 `wgrep-auto-save-buffer' is non-nil."
   (interactive)
   (let ((all-tran (wgrep-compute-transaction))

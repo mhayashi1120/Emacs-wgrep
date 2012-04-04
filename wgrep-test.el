@@ -140,6 +140,7 @@
 
 ;; TODO 
 ;; * wgrep-toggle-readonly-area
+;; ** sort-lines
 ;; * wgrep-abort-changes
 ;; * wgrep-exit
 ;; * broken file contents (invalid coding system)

@@ -81,6 +81,9 @@
 ;; * Reinforce checking error.
 ;; * Support removing whole line include new-line.
 
+;;; TODO:
+;; * sort-lines
+
 ;;; Code:
 
 (require 'grep)
@@ -170,9 +173,6 @@ a file."
      ()))
   "*Face used for the line in the grep buffer that can be applied to a file."
   :group 'wgrep)
-
-(defvar wgrep-overlays nil)
-(make-variable-buffer-local 'wgrep-overlays)
 
 (defvar wgrep-file-overlays nil)
 (make-variable-buffer-local 'wgrep-file-overlays)
@@ -348,23 +348,25 @@ a file."
   (overlay-put ov 'priority 1)
   (overlay-put ov 'wgrep-reject-message message))
 
-(defun wgrep-register-edit-overlay (ov)
-  (unless (memq ov wgrep-overlays)
-    ;; register overlay
-    (setq wgrep-overlays (cons ov wgrep-overlays))))
+(defun wgrep-edit-overlays ()
+  (let (res)
+    (dolist (ov (overlays-in (point-min) (point-max)))
+      (when (overlay-get ov 'wgrep-changed)
+        (setq res (cons ov res))))
+    (nreverse res)))
 
 (defun wgrep-put-change-face (beg end)
   (save-excursion
-    ;; looking-at destroy replace regexp..
+    ;; looking-at destroy match data while replace by regexp.
     (save-match-data
       (let ((ov (wgrep-editing-overlay beg end)))
         ;; delete overlay if text is same as old value.
         (cond
-         ((null ov))                    ; not a valid point
+         ;; not a valid point
+         ((null ov))
          ((string= (overlay-get ov 'wgrep-old-text)
                    (overlay-get ov 'wgrep-edit-text))
           ;; back to unchanged
-          (setq wgrep-overlays (remq ov wgrep-overlays))
           (delete-overlay ov))
          (t
           (overlay-put ov 'face 'wgrep-face)
@@ -393,7 +395,10 @@ a file."
       (setq bog bol
             eog eol))
     (goto-char bog)
-    (when (looking-at wgrep-line-file-regexp)
+    (cond
+     ;; When handling whole line, BOL equal beginning of edit.
+     ((and (null ov) start (= bog start)))
+     ((looking-at wgrep-line-file-regexp)
       (let* ((header (match-string-no-properties 0))
              (header-end (match-end 0))
              (filename (match-string-no-properties 1))
@@ -413,10 +418,11 @@ a file."
             (overlay-put ov 'wgrep-linum linum)
             (overlay-put ov 'wgrep-changed t)
             (overlay-put ov 'priority 0)
+            (overlay-put ov 'evaporate t)
             (overlay-put ov 'wgrep-old-text old)))
          (t
           (move-overlay ov bog eog)))
-        (overlay-put ov 'wgrep-edit-text value)))
+        (overlay-put ov 'wgrep-edit-text value))))
     ov))
 
 (defun wgrep-to-grep-mode ()
@@ -439,22 +445,20 @@ These changes are not immediately saved to disk unless
     (dolist (buf-tran all-tran)
       (let ((commited (wgrep-commit-buffer (car buf-tran) (cdr buf-tran))))
         (setq done (append done commited))))
-    ;; remove committed overlays
-    (dolist (ov done)
-      (setq wgrep-overlays (delq ov wgrep-overlays)))
     (wgrep-cleanup-temp-buffer)
     (wgrep-to-grep-mode)
-    (let ((msg (format "(%d changed)" (length done))))
+    (let ((msg (format "(%d changed)" (length done)))
+          (ovs (wgrep-edit-overlays)))
       (cond
-       ((null wgrep-overlays)
+       ((null ovs)
         (if (= (length done) 0)
             (message "(No changes to be performed)")
           (message "Successfully finished. %s" msg)))
-       ((= (length wgrep-overlays) 1)
+       ((= (length ovs) 1)
         (message "There is an unapplied change. %s" msg))
        (t
         (message "There are %d unapplied changes. %s"
-                 (length wgrep-overlays) msg))))))
+                 (length ovs) msg))))))
 
 (defun wgrep-exit ()
   "Return to `grep-mode'"
@@ -529,7 +533,8 @@ for several minutes.
   (wgrep-clone-to-temp-buffer)
   (setq buffer-read-only nil)
   (buffer-enable-undo)
-  (set-buffer-modified-p wgrep-overlays) ;; restore modified status
+  ;; restore modified status
+  (set-buffer-modified-p (wgrep-edit-overlays))
   (setq buffer-undo-list nil)
   (message "%s" (substitute-command-keys
                  "Press \\[wgrep-finish-edit] when finished \
@@ -706,8 +711,7 @@ This change will be applied when \\[wgrep-finish-edit]."
                (re-search-forward (concat "^" (regexp-quote savedh)) nil t)
                (move-to-column savedc))
           (goto-char (min (point-max) savedp)))
-      (wgrep-cleanup-temp-buffer)
-      (setq wgrep-overlays nil)))
+      (wgrep-cleanup-temp-buffer)))
    (t
     ;; non fatal error
     (message "Error! Saved buffer is unavailable."))))
@@ -741,7 +745,7 @@ This change will be applied when \\[wgrep-finish-edit]."
 ;; value ::= linum old-text new-text result-overlay edit-overlay
 (defun wgrep-transaction-editing-list ()
   (let (res)
-    (dolist (ov wgrep-overlays)
+    (dolist (ov (wgrep-edit-overlays))
       (goto-char (overlay-start ov))
       (forward-line 0)
       (cond

@@ -299,12 +299,14 @@ a file."
   (let ((beg (point))
         end)
     (insert new-text)
-    (setq end (point))
-    ;; hilight the changed line
-    (wgrep-put-color-file beg end)))
+    (let* ((end (point))
+           ;; hilight the changed line
+           (ov (wgrep-put-overlay-to-file-buffer beg end)))
+      ;; make overlay volatile.
+      (wgrep-let-destructive-overlay ov))))
 
 (defun wgrep-flush-whole-line ()
-  (wgrep-put-color-file
+  (wgrep-put-overlay-to-file-buffer
    (line-beginning-position) (line-end-position))
   (wgrep-delete-whole-line))
 
@@ -324,7 +326,7 @@ a file."
         (decode-coding-string (substring str (match-end 0)) cs)
       string)))
 
-(defun wgrep-put-color-file (beg end)
+(defun wgrep-put-overlay-to-file-buffer (beg end)
   "*Highlight the changes in the file"
   (let ((ov
          (catch 'done
@@ -335,8 +337,8 @@ a file."
            (wgrep-make-overlay beg end))))
     (overlay-put ov 'face 'wgrep-file-face)
     (overlay-put ov 'priority 0)
-    (wgrep-let-destructive-overlay ov)
-    (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)))
+    (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)
+    ov))
 
 (defun wgrep-put-done-result (ov)
   (wgrep-set-result ov 'wgrep-done-face))

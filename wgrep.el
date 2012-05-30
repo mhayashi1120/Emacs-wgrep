@@ -174,9 +174,6 @@ a file."
   "*Face used for the line in the grep buffer that can be applied to a file."
   :group 'wgrep)
 
-(defvar wgrep-file-overlays nil)
-(make-variable-buffer-local 'wgrep-file-overlays)
-
 (defvar wgrep-readonly-state nil)
 (make-variable-buffer-local 'wgrep-readonly-state)
 
@@ -280,15 +277,21 @@ a file."
      ov prop
      `((lambda (ov after-p &rest ignore)
          (when after-p
-           (setq wgrep-file-overlays
-                 (delq ov wgrep-file-overlays))
            (delete-overlay ov)))))))
 
 (defun wgrep-after-save-hook ()
   (remove-hook 'after-save-hook 'wgrep-after-save-hook t)
-  (dolist (ov wgrep-file-overlays)
-    (delete-overlay ov))
-  (kill-local-variable 'wgrep-file-overlays))
+  (dolist (ov (wgrep-file-overlays))
+    (delete-overlay ov)))
+
+(defun wgrep-file-overlays ()
+  (save-restriction
+    (widen)
+    (let (res)
+      (dolist (ov (overlays-in (point-min) (point-max)))
+        (when (overlay-get ov 'wgrep)
+          (setq res (cons ov res))))
+      (nreverse res))))
 
 (defun wgrep-replace-to-new-line (new-text)
   ;; delete grep extracted region (restricted to a line)
@@ -333,8 +336,7 @@ a file."
     (overlay-put ov 'face 'wgrep-file-face)
     (overlay-put ov 'priority 0)
     (wgrep-let-destructive-overlay ov)
-    (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)
-    (setq wgrep-file-overlays (cons ov wgrep-file-overlays))))
+    (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)))
 
 (defun wgrep-put-done-result (ov)
   (wgrep-set-result ov 'wgrep-done-face))
@@ -369,8 +371,7 @@ a file."
           ;; back to unchanged
           (delete-overlay ov))
          (t
-          (overlay-put ov 'face 'wgrep-face)
-          (wgrep-register-edit-overlay ov)))))))
+          (overlay-put ov 'face 'wgrep-face)))))))
 
 ;; get overlay BEG and END is passed by `after-change-functions'
 (defun wgrep-editing-overlay (&optional start end)
@@ -546,11 +547,10 @@ or \\[wgrep-abort-changes] to abort changes.")))
   (let ((count 0))
     (dolist (b (buffer-list))
       (with-current-buffer b
-        (when (and (local-variable-p 'wgrep-file-overlays)
-                   wgrep-file-overlays
-                   (buffer-modified-p))
+        (let ((ovs (wgrep-file-overlays)))
+        (when (and ovs (buffer-modified-p))
           (basic-save-buffer)
-          (setq count (1+ count)))))
+          (setq count (1+ count))))))
     (cond
      ((= count 0)
       (message "No buffer has been saved."))
@@ -574,8 +574,7 @@ This change will be applied when \\[wgrep-finish-edit]."
                   (begin (overlay-get ov 'wgrep-contents-begin))
                   (end (overlay-end ov)))
               (delete-region begin end)
-              (overlay-put ov 'face 'wgrep-delete-face)
-              (wgrep-register-edit-overlay ov)))
+              (overlay-put ov 'face 'wgrep-delete-face)))
         (error
          (delete-overlay ov))))))
 

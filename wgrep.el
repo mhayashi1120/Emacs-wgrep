@@ -616,7 +616,11 @@ This change will be applied when \\[wgrep-finish-edit]."
   (forward-line (1- line)))
 
 ;; -A -B -C output may be misunderstood and set read-only.
-;; (e.g. filename-20-2010/01/01 23:59:99)
+;; Context match break font-lock if context have at least two `:'.
+;; e.g.
+;; filename-1-2010-01-01 23:59:99
+;; filename:2:hoge
+;; filename-3-20:10:25
 (defun wgrep-prepare-context-while (filename line forward)
   (let* ((diff (if forward 1 -1))
          (next (+ diff line)))

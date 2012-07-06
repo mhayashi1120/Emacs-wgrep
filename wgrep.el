@@ -81,9 +81,6 @@
 ;; * Reinforce checking error.
 ;; * Support removing whole line include new-line.
 
-;;; TODO:
-;; * sort-lines
-
 ;;; Code:
 
 (require 'grep)

@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 2.0.0
+;; Version: 2.0.1
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -80,9 +80,6 @@
 ;; * Change face easy to see.
 ;; * Reinforce checking error.
 ;; * Support removing whole line include new-line.
-
-;;; TODO:
-;; * sort-lines
 
 ;;; Code:
 
@@ -616,12 +613,17 @@ This change will be applied when \\[wgrep-finish-edit]."
   (forward-line (1- line)))
 
 ;; -A -B -C output may be misunderstood and set read-only.
-;; (e.g. filename-20-2010/01/01 23:59:99)
+;; Context match break font-lock if context have at least two `:'.
+;; e.g.
+;; filename-1-2010-01-01 23:59:99
+;; filename:2:hoge
+;; filename-3-20:10:25
 (defun wgrep-prepare-context-while (filename line forward)
   (let* ((diff (if forward 1 -1))
-         (next (+ diff line)))
+         (next (+ diff line))
+         (fregexp (regexp-quote filename)))
     (forward-line diff)
-    (while (looking-at (format "^%s\\(-\\)%d\\(-\\)" filename next))
+    (while (looking-at (format "^%s\\(-\\)%d\\(-\\)" fregexp next))
       (let ((line-head (format "%s:%d:" filename next)))
         (replace-match line-head nil nil nil 0)
         (forward-line diff)

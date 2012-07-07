@@ -223,11 +223,19 @@ a file."
 
 (defun wgrep-set-readonly-area (state)
   (let ((inhibit-read-only t)
-        (wgrep-inhibit-modification-hook t)
-        (regexp (format "\\(?:%s\\|\n\\)" wgrep-line-file-regexp)))
+        (wgrep-inhibit-modification-hook t))
     (save-excursion
-      (wgrep-goto-first-found)
-      (while (re-search-forward regexp nil t)
+      (goto-char (point-min))
+      (catch 'done
+        (while (not (eobp))
+          (let ((start (next-single-property-change (point) 'wgrep-line-filename)))
+            (unless start
+              (throw 'done t))
+            (let ((end (next-single-property-change start 'wgrep-line-filename)))
+              (wgrep-set-readonly-property start end state)
+              (goto-char end)))))
+      (goto-char (point-min))
+      (while (re-search-forward "\n" nil t)
         (wgrep-set-readonly-property
          (match-beginning 0) (match-end 0) state)))
     (setq wgrep-readonly-state state)))
@@ -398,20 +406,19 @@ a file."
     (cond
      ;; When handling whole line, BOL equal beginning of edit.
      ((and (null ov) start (= bog start)))
-     ((looking-at wgrep-line-file-regexp)
-      (let* ((header (match-string-no-properties 0))
-             (header-end (match-end 0))
-             (filename (match-string-no-properties 1))
-             (line (match-string-no-properties 3))
-             (linum (string-to-number line))
-             (value (buffer-substring-no-properties (match-end 0) eog))
+     ((get-text-property (point) 'wgrep-line-filename)
+      (let* ((header-end
+              (next-single-property-change (point) 'wgrep-line-filename nil eol))
+             (filename (get-text-property (point) 'wgrep-line-filename))
+             (linum (get-text-property (point) 'wgrep-line-number))
+             (value (buffer-substring-no-properties header-end eog))
              contents-begin)
         (goto-char header-end)
         (setq contents-begin (point-marker))
         ;; create editing overlay
         (cond
          ((null ov)
-          (let ((old (wgrep-get-old-text header)))
+          (let ((old (wgrep-get-old-text filename linum)))
             (setq ov (wgrep-make-overlay bog eog))
             (overlay-put ov 'wgrep-contents-begin contents-begin)
             (overlay-put ov 'wgrep-filename filename)
@@ -582,17 +589,19 @@ This change will be applied when \\[wgrep-finish-edit]."
   (while (not (eobp))
     (cond
      ((looking-at wgrep-line-file-regexp)
-      (let ((filename (match-string 1))
-            (line (string-to-number (match-string 3))))
-        ;; delete backward and forward following options.
-        ;; -A (--after-context) -B  (--before-context) -C (--context)
-        (save-excursion
-          (wgrep-prepare-context-while filename line nil))
-        (wgrep-prepare-context-while filename line t)
-        (forward-line -1)))
-     ((looking-at "^--$")
-      (wgrep-delete-whole-line)
-      (forward-line -1)))
+      (let ((filename (match-string-no-properties 1))
+            (line (string-to-number (match-string 3)))
+            (start (match-beginning 0))
+            (end (match-end 0)))
+        (when (file-exists-p filename)
+          (put-text-property start end 'wgrep-line-filename filename)
+          (put-text-property start end 'wgrep-line-number line)
+          ;; delete backward and forward following options.
+          ;; -A (--after-context) -B  (--before-context) -C (--context)
+          (save-excursion
+            (wgrep-prepare-context-while filename line nil))
+          (wgrep-prepare-context-while filename line t)
+          (forward-line -1)))))
     (forward-line 1)))
 
 (defun wgrep-delete-whole-line ()
@@ -624,8 +633,11 @@ This change will be applied when \\[wgrep-finish-edit]."
          (fregexp (regexp-quote filename)))
     (forward-line direction)
     (while (looking-at (format "^%s-%d-" fregexp next))
-      (let ((line-head (format "%s:%d:" filename next)))
-        (replace-match line-head nil nil nil 0)
+      (let ((line-head (format "%s:%d:" filename next))
+            (start (match-beginning 0))
+            (end (match-end 0)))
+        (put-text-property start end 'wgrep-line-filename filename)
+        (put-text-property start end 'wgrep-line-number next)
         (forward-line direction)
         (setq next (+ direction next))))))
 
@@ -634,12 +646,13 @@ This change will be applied when \\[wgrep-finish-edit]."
     (or (null proc)
         (eq (process-status proc) 'exit))))
 
-(defun wgrep-set-readonly-property (start end value &optional object)
-  (put-text-property start end 'read-only value object)
+;; TODO expand to calling point
+(defun wgrep-set-readonly-property (start end value)
+  (put-text-property start end 'read-only value)
   ;; This means grep header (filename and line num) that rear is editable text.
   ;; Header text length will always be greater than 2.
   (when (> end (1+ start))
-    (add-text-properties (1- end) end '(rear-nonsticky t) object)))
+    (add-text-properties (1- end) end '(rear-nonsticky t))))
 
 (defun wgrep-prepare-to-edit ()
   (save-excursion
@@ -732,16 +745,19 @@ This change will be applied when \\[wgrep-finish-edit]."
 (defun wgrep-current-header ()
   (save-excursion
     (forward-line 0)
+    ;;TODO obsolete to use  wgrep-line-file-regexp here.
     (when (looking-at wgrep-line-file-regexp)
       (match-string-no-properties 0))))
 
-(defun wgrep-get-old-text (header)
+(defun wgrep-get-old-text (file number)
   (when (and wgrep-each-other-buffer
              (buffer-live-p wgrep-each-other-buffer))
     (with-current-buffer wgrep-each-other-buffer
       (goto-char (point-min))
-      (when (re-search-forward (concat "^" (regexp-quote header)) nil t)
-        (buffer-substring-no-properties (point) (line-end-position))))))
+      ;;TODO search by property
+      (let ((header (format "^%s[:-]%s[:-]" file number)))
+        (when (re-search-forward header nil t)
+          (buffer-substring-no-properties (point) (line-end-position)))))))
 
 ;; return alist like following
 ;; key ::= buffer
@@ -754,13 +770,13 @@ This change will be applied when \\[wgrep-finish-edit]."
       (cond
        ;; ignore removed line or removed overlay
        ((eq (overlay-start ov) (overlay-end ov)))
-       ((looking-at wgrep-line-file-regexp)
-        (let* ((name (match-string-no-properties 1))
-               (line (match-string-no-properties 3))
-               (start (match-end 0))
+       ((get-text-property (point) 'wgrep-line-filename)
+        (let* ((name (get-text-property (point) 'wgrep-line-filename))
+               (linum (get-text-property (point) 'wgrep-line-number))
+               (start (next-single-property-change
+                       (point) 'wgrep-line-filename nil (line-end-position)))
                (file (expand-file-name name default-directory))
                (buffer (wgrep-get-file-buffer file))
-               (linum (string-to-number line))
                (old (overlay-get ov 'wgrep-old-text))
                (new (overlay-get ov 'wgrep-edit-text))
                result)

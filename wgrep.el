@@ -619,14 +619,15 @@ This change will be applied when \\[wgrep-finish-edit]."
 ;; filename:2:hoge
 ;; filename-3-20:10:25
 (defun wgrep-prepare-context-while (filename line forward)
-  (let* ((diff (if forward 1 -1))
-         (next (+ diff line)))
-    (forward-line diff)
-    (while (looking-at (format "^%s\\(-\\)%d\\(-\\)" filename next))
+  (let* ((direction (if forward 1 -1))
+         (next (+ direction line))
+         (fregexp (regexp-quote filename)))
+    (forward-line direction)
+    (while (looking-at (format "^%s-%d-" fregexp next))
       (let ((line-head (format "%s:%d:" filename next)))
         (replace-match line-head nil nil nil 0)
-        (forward-line diff)
-        (setq next (+ diff next))))))
+        (forward-line direction)
+        (setq next (+ direction next))))))
 
 (defun wgrep-process-exited-p ()
   (let ((proc (get-buffer-process (current-buffer))))

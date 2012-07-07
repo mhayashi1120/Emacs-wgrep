@@ -223,18 +223,18 @@ a file."
 
 (defun wgrep-set-readonly-area (state)
   (let ((inhibit-read-only t)
-        (wgrep-inhibit-modification-hook t))
+        (wgrep-inhibit-modification-hook t)
+        start end)
     (save-excursion
+      ;; set readonly grep result filename
       (goto-char (point-min))
-      (catch 'done
-        (while (not (eobp))
-          (let ((start (next-single-property-change (point) 'wgrep-line-filename)))
-            (unless start
-              (throw 'done t))
-            (let ((end (next-single-property-change start 'wgrep-line-filename)))
-              (wgrep-set-readonly-property start end state)
-              (goto-char end)))))
+      (while (setq start (next-single-property-change (point) 'wgrep-line-filename))
+        (setq end (next-single-property-change start 'wgrep-line-filename))
+        (wgrep-set-readonly-property start end state)
+        (goto-char end))
+      ;; set readonly all newline
       (goto-char (point-min))
+      ;;TODO don't read-only if edited text.
       (while (re-search-forward "\n" nil t)
         (wgrep-set-readonly-property
          (match-beginning 0) (match-end 0) state)))
@@ -601,6 +601,7 @@ This change will be applied when \\[wgrep-finish-edit]."
           (save-excursion
             (wgrep-prepare-context-while filename line nil))
           (wgrep-prepare-context-while filename line t)
+          ;;TODO describe why -1
           (forward-line -1)))))
     (forward-line 1)))
 

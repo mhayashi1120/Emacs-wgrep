@@ -234,16 +234,19 @@ a file."
     (save-excursion
       ;; set readonly grep result filename
       (goto-char (point-min))
-      (while (setq start (next-single-property-change (point) 'wgrep-line-filename))
-        (setq end (next-single-property-change start 'wgrep-line-filename))
-        (wgrep-set-readonly-property start end state)
+      (while (setq start (next-single-property-change
+                          (point) 'wgrep-line-filename))
+        (setq end (next-single-property-change
+                   start 'wgrep-line-filename nil))
+        (put-text-property start end 'read-only state)
+        (put-text-property (1- end) end 'rear-nonsticky t)
         (goto-char end))
       ;; set readonly all newline
       (goto-char (point-min))
       ;;TODO don't read-only if edited text.
       (while (re-search-forward "\n" nil t)
-        (wgrep-set-readonly-property
-         (match-beginning 0) (match-end 0) state)))
+        (put-text-property
+         (match-beginning 0) (match-end 0) 'read-only state)))
     (setq wgrep-readonly-state state)))
 
 (defun wgrep-after-change-function (beg end leng-before)
@@ -446,7 +449,12 @@ a file."
   (use-local-map grep-mode-map)
   (set-buffer-modified-p nil)
   (setq buffer-undo-list nil)
-  (setq buffer-read-only t))
+  (setq buffer-read-only t)
+  ;;TODO
+  ;; (setq compilation-error-regexp-alist grep-regexp-alist)
+  ;; (setq font-lock-defaults '(compilation-mode-font-lock-keywords t))
+  ;; (font-lock-add-keywords nil (compilation-mode-font-lock-keywords))
+  )
 
 (defun wgrep-finish-edit ()
   "Apply changes to file buffers.
@@ -501,6 +509,7 @@ These changes are not immediately saved to disk unless
   (interactive)
   (wgrep-cleanup-overlays (point-min) (point-max)))
 
+;;TODO "--" context separator
 (defun wgrep-toggle-readonly-area ()
   "Toggle read-only area to remove a whole line.
 
@@ -549,6 +558,13 @@ for several minutes.
   ;; restore modified status
   (set-buffer-modified-p (wgrep-edit-overlays))
   (setq buffer-undo-list nil)
+  ;;TODO
+  ;; (setq compilation-error-regexp-alist nil)
+  ;; (font-lock-remove-keywords nil (compilation-mode-font-lock-keywords))
+  ;; (setq font-lock-defaults nil)
+  ;; (font-lock-refresh-defaults)
+  ;; (font-lock-mode -1)
+
   (message "%s" (substitute-command-keys
                  "Press \\[wgrep-finish-edit] when finished \
 or \\[wgrep-abort-changes] to abort changes.")))
@@ -598,17 +614,34 @@ This change will be applied when \\[wgrep-finish-edit]."
       (let ((filename (match-string-no-properties 1))
             (line (string-to-number (match-string 3)))
             (start (match-beginning 0))
-            (end (match-end 0)))
+            (end (match-end 0))
+            (fstart (match-beginning 1))
+            (fend (match-end 1))
+            (lstart (match-beginning 3))
+            (lend (match-end 3)))
+        ;; check relative path grep result
+        ;; grep result may be --context result with number between 2 colon.
+        ;; ./filename-1-:10:
+        ;; that make misunderstand font-locking
         (when (file-exists-p filename)
           (put-text-property start end 'wgrep-line-filename filename)
           (put-text-property start end 'wgrep-line-number line)
+          ;; (put-text-property (line-beginning-position) (line-end-position) 'font-lock-face nil)
+          ;; (put-text-property (line-beginning-position) (line-end-position) 'face nil)
+          ;; (put-text-property fstart fend 'font-lock-face
+          ;;                    `(,compilation-info-face))
+          ;; (put-text-property lstart lend 'font-lock-face
+          ;;                    `(,compilation-line-face))
           ;; delete backward and forward following options.
-          ;; -A (--after-context) -B  (--before-context) -C (--context)
+          ;; -A (--after-context) -B (--before-context) -C (--context)
           (save-excursion
             (wgrep-prepare-context-while filename line nil))
           (wgrep-prepare-context-while filename line t)
-          ;;TODO describe why -1
-          (forward-line -1)))))
+          ;; end of context output `--'.
+          (forward-line -1))))
+     ((looking-at "^--+$")
+      (put-text-property
+       (line-beginning-position) (line-end-position) 'read-only t)))
     (forward-line 1)))
 
 (defun wgrep-delete-whole-line ()
@@ -645,6 +678,8 @@ This change will be applied when \\[wgrep-finish-edit]."
             (end (match-end 0)))
         (put-text-property start end 'wgrep-line-filename filename)
         (put-text-property start end 'wgrep-line-number next)
+        ;; (put-text-property (line-beginning-position) (line-end-position)
+        ;;                    'font-lock-face `(,grep-context-face))
         (forward-line direction)
         (setq next (+ direction next))))))
 
@@ -652,14 +687,6 @@ This change will be applied when \\[wgrep-finish-edit]."
   (let ((proc (get-buffer-process (current-buffer))))
     (or (null proc)
         (eq (process-status proc) 'exit))))
-
-;; TODO expand to calling point
-(defun wgrep-set-readonly-property (start end value)
-  (put-text-property start end 'read-only value)
-  ;; This means grep header (filename and line num) that rear is editable text.
-  ;; Header text length will always be greater than 2.
-  (when (> end (1+ start))
-    (add-text-properties (1- end) end '(rear-nonsticky t))))
 
 (defun wgrep-prepare-to-edit ()
   (save-excursion
@@ -761,10 +788,16 @@ This change will be applied when \\[wgrep-finish-edit]."
              (buffer-live-p wgrep-each-other-buffer))
     (with-current-buffer wgrep-each-other-buffer
       (goto-char (point-min))
-      ;;TODO search by property
-      (let ((header (format "^%s[:-]%s[:-]" file number)))
-        (when (re-search-forward header nil t)
-          (buffer-substring-no-properties (point) (line-end-position)))))))
+      (let ((regexp (concat "^" file)))
+        (catch 'found
+          (while (re-search-forward regexp nil t)
+            (let ((f (get-text-property (point) 'wgrep-line-filename))
+                  (n (get-text-property (point) 'wgrep-line-number))
+                  (start (next-single-property-change (point) 'wgrep-line-filename)))
+              (when (and (string= f file) (eq number n))
+                (throw 'found
+                       (buffer-substring-no-properties
+                        start (line-end-position)))))))))))
 
 ;; return alist like following
 ;; key ::= buffer

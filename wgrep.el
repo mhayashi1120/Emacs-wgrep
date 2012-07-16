@@ -181,13 +181,9 @@ a file."
 ;; GNU Emacs have this variable at least version 21 or later
 (defvar auto-coding-regexp-alist)
 
-(defconst wgrep-line-file-regexp
-  ;; ack-and-a-half-mode prints a column number too, so we catch that
-  ;; if it exists.  Here \2 is a colon + whitespace separator.  This
-  ;; might need to change if (caar grep-regexp-alist) does.
-  (concat
-   (caar grep-regexp-alist)
-   "\\(?:\\([1-9][0-9]*\\)\\2\\)?"))
+(defvar wgrep-acceptable-modes nil)
+
+(defvar wgrep-line-file-regexp (caar grep-regexp-alist))
 (defvar wgrep-inhibit-modification-hook nil)
 
 (defvar wgrep-mode-map nil)
@@ -211,6 +207,10 @@ a file."
 (defun wgrep-setup ()
   "Setup wgrep preparation."
   (define-key grep-mode-map wgrep-enable-key 'wgrep-change-to-wgrep-mode)
+  (wgrep-setup-internal))
+
+(defun wgrep-setup-internal ()
+  (add-to-list 'wgrep-acceptable-modes major-mode)
   ;; delete previous wgrep overlays
   (wgrep-cleanup-overlays (point-min) (point-max))
   (remove-hook 'post-command-hook 'wgrep-maybe-echo-error-at-point t)
@@ -532,9 +532,8 @@ When the *grep* buffer is huge, this might freeze your Emacs
 for several minutes.
 "
   (interactive)
-  (unless (member major-mode
-                  '(grep-mode ack-and-a-half-mode))
-    (error "Not a grep buffer"))
+  (unless (memq major-mode wgrep-acceptable-modes)
+    (error "Not a wgrep editable buffer"))
   (unless (wgrep-process-exited-p)
     (error "Active process working"))
   (wgrep-prepare-to-edit)
@@ -887,16 +886,6 @@ NEW may be nil this means deleting whole line."
      (t
       ;; new nil means flush whole line.
       (wgrep-flush-whole-line)))))
-
-;;;
-;;; Support for ack-and-a-half-mode
-;;;
-
-(eval-after-load 'ack-and-a-half
-  '(progn
-     (add-hook 'ack-and-a-half-mode-hook 'wgrep-setup)
-     (define-key ack-and-a-half-mode-map
-       wgrep-enable-key 'wgrep-change-to-wgrep-mode)))
 
 ;;;
 ;;; activate/deactivate marmalade install or github install.

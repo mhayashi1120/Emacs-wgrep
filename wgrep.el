@@ -181,7 +181,13 @@ a file."
 ;; GNU Emacs have this variable at least version 21 or later
 (defvar auto-coding-regexp-alist)
 
-(defconst wgrep-line-file-regexp (caar grep-regexp-alist))
+(defconst wgrep-line-file-regexp
+  ;; ack-and-a-half-mode prints a column number too, so we catch that
+  ;; if it exists.  Here \2 is a colon + whitespace separator.  This
+  ;; might need to change if (caar grep-regexp-alist) does.
+  (concat
+   (caar grep-regexp-alist)
+   "\\(?:\\([1-9][0-9]*\\)\\2\\)?"))
 (defvar wgrep-inhibit-modification-hook nil)
 
 (defvar wgrep-mode-map nil)
@@ -526,7 +532,8 @@ When the *grep* buffer is huge, this might freeze your Emacs
 for several minutes.
 "
   (interactive)
-  (unless (eq major-mode 'grep-mode)
+  (unless (member major-mode
+                  '(grep-mode ack-and-a-half-mode))
     (error "Not a grep buffer"))
   (unless (wgrep-process-exited-p)
     (error "Active process working"))
@@ -871,7 +878,7 @@ NEW may be nil this means deleting whole line."
         (setq new (wgrep-string-replace-bom new coding))))
     ;; Check buffer line was modified after execute grep.
     (unless (string= old
-                     (buffer-substring
+                     (buffer-substring-no-properties
                       (line-beginning-position) (line-end-position)))
       (signal 'wgrep-error (list "Buffer was changed after grep.")))
     (cond
@@ -880,6 +887,16 @@ NEW may be nil this means deleting whole line."
      (t
       ;; new nil means flush whole line.
       (wgrep-flush-whole-line)))))
+
+;;;
+;;; Support for ack-and-a-half-mode
+;;;
+
+(eval-after-load 'ack-and-a-half
+  '(progn
+     (add-hook 'ack-and-a-half-mode-hook 'wgrep-setup)
+     (define-key ack-and-a-half-mode-map
+       wgrep-enable-key 'wgrep-change-to-wgrep-mode)))
 
 ;;;
 ;;; activate/deactivate marmalade install or github install.

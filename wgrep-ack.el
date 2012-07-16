@@ -1,4 +1,4 @@
-;;; wgrep-ack.el --- Writable ack todo buffer and apply the changes to files
+;;; wgrep-ack.el --- Writable ack-and-a-half buffer and apply the changes to files
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Contributor: Ivan Andrus <darthandrus@gmail.com>
@@ -24,13 +24,17 @@
 
 ;;; Commentary:
 
-;; wgrep-ack allows you to edit a ack buffer and apply those changes to
-;; the file buffer.
+;; wgrep-ack allows you to edit a ack-and-a-half buffer and apply those
+;; changes to the file buffer.
 
 ;;; Install:
 
-;; Put this file and wgrep.el into load-path'ed directory, and byte compile it
-;; if desired. And put the following expression into your ~/.emacs.
+;; 1. Install ack-and-a-half.el
+;;
+;;   https://github.com/jhelwig/ack-and-a-half
+
+;; 2. Put this file and wgrep.el into load-path'ed directory, and byte compile
+;; it if desired. And put the following expression into your ~/.emacs.
 ;;
 ;;     (require 'wgrep-ack)
 

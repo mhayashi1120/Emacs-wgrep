@@ -332,6 +332,7 @@ End of this match equals start of file contents.
 ;;Hack function
 (defun wgrep-string-replace-bom (string cs)
   (let ((regexp (car (rassq (coding-system-base cs) auto-coding-regexp-alist)))
+        ;;TODO check ack-grep
         ;; FIXME: `find-operation-coding-system' is not exactly correct.
         ;;        However almost case is ok like this bom function.
         ;;        e.g. (let ((default-process-coding-system 'some-coding))
@@ -631,13 +632,7 @@ This change will be applied when \\[wgrep-finish-edit]."
         (when (file-exists-p filename)
           (put-text-property start end 'wgrep-line-filename filename)
           (put-text-property start end 'wgrep-line-number line)
-          ;; (put-text-property (line-beginning-position) (line-end-position) 'font-lock-face nil)
-          ;; (put-text-property (line-beginning-position) (line-end-position) 'face nil)
-          ;; (put-text-property fstart fend 'font-lock-face
-          ;;                    `(,compilation-info-face))
-          ;; (put-text-property lstart lend 'font-lock-face
-          ;;                    `(,compilation-line-face))
-          ;; delete backward and forward following options.
+          ;; handle backward and forward following options.
           ;; -A (--after-context) -B (--before-context) -C (--context)
           (save-excursion
             (wgrep-prepare-context-while filename line nil))
@@ -683,8 +678,6 @@ This change will be applied when \\[wgrep-finish-edit]."
             (end (match-end 0)))
         (put-text-property start end 'wgrep-line-filename filename)
         (put-text-property start end 'wgrep-line-number next)
-        ;; (put-text-property (line-beginning-position) (line-end-position)
-        ;;                    'font-lock-face `(,grep-context-face))
         (forward-line direction)
         (setq next (+ direction next))))))
 

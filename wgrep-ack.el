@@ -3,6 +3,7 @@
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Contributor: Ivan Andrus <darthandrus@gmail.com>
 ;; Keywords: grep edit extensions
+;; Package-Requires: ((wgrep "2.1.0"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-ack.el
 ;; Emacs: GNU Emacs 22 or later
 ;; Version: 0.1.0
@@ -33,8 +34,10 @@
 ;;
 ;;   https://github.com/jhelwig/ack-and-a-half
 
-;; 2. Put this file and wgrep.el into load-path'ed directory, and byte compile
-;; it if desired. And put the following expression into your ~/.emacs.
+;; 2. Install wgrep.el
+
+;; 3. Put this file into load-path'ed directory, and byte compile it if
+;; desired. And put the following expression into your ~/.emacs.
 ;;
 ;;     (require 'wgrep-ack)
 

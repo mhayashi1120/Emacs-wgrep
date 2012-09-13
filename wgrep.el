@@ -183,7 +183,12 @@ a file."
 
 (defvar wgrep-acceptable-modes nil)
 
-(defvar wgrep-line-file-regexp (caar grep-regexp-alist))
+(defvar wgrep-line-file-regexp (caar grep-regexp-alist)
+  "Regexp that match to line header of grep result.
+
+That capture 1: filename 3: line-number
+End of this match equals start of file contents.
+")
 (defvar wgrep-inhibit-modification-hook nil)
 
 (defvar wgrep-mode-map nil)

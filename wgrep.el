@@ -249,7 +249,7 @@ End of this match equals start of file contents.
         (goto-char end))
       ;; set readonly all newline
       (goto-char (point-min))
-      ;;TODO don't read-only if edited text.
+      ;;TODO don't make read-only if edited text. edited text may have newline
       (while (re-search-forward "\n" nil t)
         (put-text-property
          (match-beginning 0) (match-end 0) 'read-only state)))
@@ -766,7 +766,7 @@ This change will be applied when \\[wgrep-finish-edit]."
 (defun wgrep-current-header ()
   (save-excursion
     (forward-line 0)
-    ;;TODO obsolete to use  wgrep-line-file-regexp here.
+    ;;TODO obsolete to use  wgrep-line-file-regexp here. to use text property
     (when (looking-at wgrep-line-file-regexp)
       (match-string-no-properties 0))))
 

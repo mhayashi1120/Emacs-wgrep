@@ -90,6 +90,7 @@
 
 (defgroup wgrep nil
   "Customize wgrep"
+  :prefix "wgrep-"
   :group 'grep)
 
 (defcustom wgrep-change-readonly-file nil
@@ -455,12 +456,7 @@ End of this match equals start of file contents.
   (use-local-map grep-mode-map)
   (set-buffer-modified-p nil)
   (setq buffer-undo-list nil)
-  (setq buffer-read-only t)
-  ;;TODO
-  ;; (setq compilation-error-regexp-alist grep-regexp-alist)
-  ;; (setq font-lock-defaults '(compilation-mode-font-lock-keywords t))
-  ;; (font-lock-add-keywords nil (compilation-mode-font-lock-keywords))
-  )
+  (setq buffer-read-only t))
 
 (defun wgrep-finish-edit ()
   "Apply changes to file buffers.
@@ -564,13 +560,6 @@ for several minutes.
   ;; restore modified status
   (set-buffer-modified-p (wgrep-edit-overlays))
   (setq buffer-undo-list nil)
-  ;;TODO
-  ;; (setq compilation-error-regexp-alist nil)
-  ;; (font-lock-remove-keywords nil (compilation-mode-font-lock-keywords))
-  ;; (setq font-lock-defaults nil)
-  ;; (font-lock-refresh-defaults)
-  ;; (font-lock-mode -1)
-
   (message "%s" (substitute-command-keys
                  "Press \\[wgrep-finish-edit] when finished \
 or \\[wgrep-abort-changes] to abort changes.")))

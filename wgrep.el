@@ -689,6 +689,7 @@ This change will be applied when \\[wgrep-finish-edit]."
             (wgrep-inhibit-modification-hook t)
             buffer-read-only beg end)
         ;; Set read-only grep result header
+        (goto-char (point-min))
         (setq beg (point-min))
         (when (re-search-forward "^Grep " nil t)
           ;; See `compilation-start'
@@ -777,9 +778,10 @@ This change will be applied when \\[wgrep-finish-edit]."
 (defun wgrep-current-header ()
   (save-excursion
     (forward-line 0)
-    ;;TODO obsolete to use  wgrep-line-file-regexp here. to use text property
-    (when (looking-at wgrep-line-file-regexp)
-      (match-string-no-properties 0))))
+    (let ((f (get-text-property (point) 'wgrep-line-filename))
+          (n (get-text-property (point) 'wgrep-line-number)))
+      (when (and f n)
+        (format "^%s\\([:-]\\)%s\\1" f n)))))
 
 (defun wgrep-get-old-text (file number)
   (when (and wgrep-each-other-buffer

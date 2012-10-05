@@ -114,10 +114,10 @@
 (defface wgrep-face
   '((((class color)
       (background dark))
-     (:background "SlateGray1" :weight bold :foreground "Black"))
+     (:background "SlateGray1" :foreground "Black"))
     (((class color)
       (background light))
-     (:background "ForestGreen" :weight bold :foreground "white"))
+     (:background "ForestGreen" :foreground "white"))
     (t
      ()))
   "*Face used for the changed text in the grep buffer."
@@ -126,10 +126,10 @@
 (defface wgrep-delete-face
   '((((class color)
       (background dark))
-     (:background "SlateGray1" :weight bold :foreground "pink"))
+     (:background "SlateGray1" :foreground "pink"))
     (((class color)
       (background light))
-     (:background "ForestGreen" :weight bold :foreground "pink"))
+     (:background "ForestGreen" :foreground "pink"))
     (t
      ()))
   "*Face used for the deleted whole line in the grep buffer."
@@ -138,10 +138,10 @@
 (defface wgrep-file-face
   '((((class color)
       (background dark))
-     (:background "gray30" :weight bold :foreground "white"))
+     (:background "gray30" :foreground "white"))
     (((class color)
       (background light))
-     (:background "ForestGreen" :weight bold :foreground "white"))
+     (:background "ForestGreen" :foreground "white"))
     (t
      ()))
   "*Face used for the changed text in the file buffer."
@@ -163,10 +163,10 @@ a file."
 (defface wgrep-done-face
   '((((class color)
       (background dark))
-     (:foreground "LightSkyBlue" :weight bold))
+     (:foreground "LightSkyBlue"))
     (((class color)
       (background light))
-     (:foreground "blue" :weight bold))
+     (:foreground "blue"))
     (t
      ()))
   "*Face used for the line in the grep buffer that can be applied to a file."
@@ -178,8 +178,8 @@ a file."
 (defvar wgrep-prepared nil)
 (make-variable-buffer-local 'wgrep-prepared)
 
-(defvar wgrep-each-other-buffer nil)
-(make-variable-buffer-local 'wgrep-each-other-buffer)
+(defvar wgrep-sibling-buffer nil)
+(make-variable-buffer-local 'wgrep-sibling-buffer)
 
 ;; Suppress elint warning
 ;; GNU Emacs have this variable at least version 21 or later
@@ -709,9 +709,8 @@ This change will be applied when \\[wgrep-finish-edit]."
         ;; Set read-only grep result header
         (goto-char (point-min))
         (setq beg (point-min))
-        (when (re-search-forward "^Grep " nil t)
-          ;; See `compilation-start'
-          (forward-line 3))
+        ;; See `compilation-start'
+        (forward-line 4)
         (setq end (point))
         (put-text-property beg end 'read-only t)
         (put-text-property beg end 'wgrep-header t)
@@ -751,19 +750,19 @@ This change will be applied when \\[wgrep-finish-edit]."
   (wgrep-cleanup-temp-buffer)
   (let ((grepbuf (current-buffer))
         (tmpbuf (generate-new-buffer " *wgrep temp* ")))
-    (setq wgrep-each-other-buffer tmpbuf)
+    (setq wgrep-sibling-buffer tmpbuf)
     (add-hook 'kill-buffer-hook 'wgrep-cleanup-temp-buffer nil t)
     (append-to-buffer tmpbuf (point-min) (point-max))
     (with-current-buffer tmpbuf
-      (setq wgrep-each-other-buffer grepbuf))
+      (setq wgrep-sibling-buffer grepbuf))
     tmpbuf))
 
 (defun wgrep-restore-from-temp-buffer ()
   (cond
-   ((and wgrep-each-other-buffer
-         (buffer-live-p wgrep-each-other-buffer))
+   ((and wgrep-sibling-buffer
+         (buffer-live-p wgrep-sibling-buffer))
     (let ((grepbuf (current-buffer))
-          (tmpbuf wgrep-each-other-buffer)
+          (tmpbuf wgrep-sibling-buffer)
           (savedh (wgrep-current-header))
           (savedc (current-column))
           (savedp (point))
@@ -789,9 +788,9 @@ This change will be applied when \\[wgrep-finish-edit]."
     (let ((grep-buffer (current-buffer)))
       (dolist (buf (buffer-list))
         (with-current-buffer buf
-          (when (eq grep-buffer wgrep-each-other-buffer)
+          (when (eq grep-buffer wgrep-sibling-buffer)
             (kill-buffer buf)))))
-    (setq wgrep-each-other-buffer nil)))
+    (setq wgrep-sibling-buffer nil)))
 
 (defun wgrep-current-header ()
   (save-excursion
@@ -802,9 +801,9 @@ This change will be applied when \\[wgrep-finish-edit]."
         (format "^%s\\([:-]\\)%s\\1" f n)))))
 
 (defun wgrep-get-old-text (file number)
-  (when (and wgrep-each-other-buffer
-             (buffer-live-p wgrep-each-other-buffer))
-    (with-current-buffer wgrep-each-other-buffer
+  (when (and wgrep-sibling-buffer
+             (buffer-live-p wgrep-sibling-buffer))
+    (with-current-buffer wgrep-sibling-buffer
       (goto-char (point-min))
       (let ((regexp (concat "^" file)))
         (catch 'found

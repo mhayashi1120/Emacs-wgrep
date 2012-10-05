@@ -175,6 +175,9 @@ a file."
 (defvar wgrep-readonly-state nil)
 (make-variable-buffer-local 'wgrep-readonly-state)
 
+(defvar wgrep-prepared nil)
+(make-variable-buffer-local 'wgrep-prepared)
+
 (defvar wgrep-each-other-buffer nil)
 (make-variable-buffer-local 'wgrep-each-other-buffer)
 
@@ -236,23 +239,25 @@ End of this match equals start of file contents.
 (defun wgrep-set-readonly-area (state)
   (let ((inhibit-read-only t)
         (wgrep-inhibit-modification-hook t)
-        start end)
+        pos start end)
     (save-excursion
       ;; set readonly grep result filename
-      (goto-char (point-min))
+      (setq pos (point-min))
       (while (setq start (next-single-property-change
-                          (point) 'wgrep-line-filename))
+                          pos 'wgrep-line-filename))
         (setq end (next-single-property-change
                    start 'wgrep-line-filename nil))
         (put-text-property start end 'read-only state)
         (put-text-property (1- end) end 'rear-nonsticky t)
-        (goto-char end))
-      ;; set readonly all newline
-      (goto-char (point-min))
-      ;;TODO don't make read-only if edited text. edited text may have newline
-      (while (re-search-forward "\n" nil t)
-        (put-text-property
-         (match-beginning 0) (match-end 0) 'read-only state)))
+        ;; set readonly all newline at end of grep line
+        (when (eq (char-before start) ?\n)
+          (put-text-property (1- start) start 'read-only state))
+        (setq pos end))
+      ;; set readonly last of grep line
+      (let ((footer (next-single-property-change (point-min) 'wgrep-footer)))
+        (when footer
+          (when (eq (char-before footer) ?\n)
+            (put-text-property (1- footer) footer 'read-only state)))))
     (setq wgrep-readonly-state state)))
 
 (defun wgrep-after-change-function (beg end leng-before)
@@ -637,14 +642,16 @@ This change will be applied when \\[wgrep-finish-edit]."
   (delete-region (line-beginning-position) (line-beginning-position 2)))
 
 (defun wgrep-goto-first-found ()
-  (goto-char (point-min))
-  (when (re-search-forward "^Grep " nil t)
-    ;; See `compilation-start'
-    (forward-line 3)))
+  (let ((header (previous-single-property-change (point-max) 'wgrep-header)))
+    (when header
+      (goto-char header)
+      header)))
 
 (defun wgrep-goto-end-of-found ()
-  (goto-char (point-max))
-  (re-search-backward "^Grep " nil t))
+  (let ((footer (next-single-property-change (point-min) 'wgrep-footer)))
+    (when footer
+      (goto-char footer)
+      footer)))
 
 (defun wgrep-goto-line (line)
   (goto-char (point-min))
@@ -676,24 +683,28 @@ This change will be applied when \\[wgrep-finish-edit]."
         (eq (process-status proc) 'exit))))
 
 (defun wgrep-prepare-to-edit ()
-  (save-excursion
-    (let ((inhibit-read-only t)
-          (wgrep-inhibit-modification-hook t)
-          buffer-read-only beg end)
-      ;; Set read-only grep result header
-      (setq beg (point-min))
-      (wgrep-goto-first-found)
-      (setq end (point))
-      (put-text-property beg end 'read-only t)
-      (put-text-property beg end 'wgrep-header t)
-      ;; Set read-only grep result footer
-      (wgrep-goto-end-of-found)
-      (setq beg (point))
-      (setq end (point-max))
-      (when beg
+  (unless wgrep-prepared
+    (save-excursion
+      (let ((inhibit-read-only t)
+            (wgrep-inhibit-modification-hook t)
+            buffer-read-only beg end)
+        ;; Set read-only grep result header
+        (setq beg (point-min))
+        (when (re-search-forward "^Grep " nil t)
+          ;; See `compilation-start'
+          (forward-line 3))
+        (setq end (point))
         (put-text-property beg end 'read-only t)
-        (put-text-property beg end 'wgrep-footer t))
-      (wgrep-prepare-context))))
+        (put-text-property beg end 'wgrep-header t)
+        ;; Set read-only grep result footer
+        (re-search-forward "^$" nil t)
+        (setq beg (point))
+        (setq end (point-max))
+        (when beg
+          (put-text-property beg end 'read-only t)
+          (put-text-property beg end 'wgrep-footer t))
+        (wgrep-prepare-context)
+        (setq wgrep-prepared t)))))
 
 (defun wgrep-set-header/footer-read-only (state)
   (let ((inhibit-read-only t)

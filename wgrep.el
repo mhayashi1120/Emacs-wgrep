@@ -246,9 +246,19 @@ End of this match equals start of file contents.
       (while (setq start (next-single-property-change
                           pos 'wgrep-line-filename))
         (setq end (next-single-property-change
-                   start 'wgrep-line-filename nil))
+                   start 'wgrep-line-filename))
         (put-text-property start end 'read-only state)
         (put-text-property (1- end) end 'rear-nonsticky t)
+        ;; set readonly all newline at end of grep line
+        (when (eq (char-before start) ?\n)
+          (put-text-property (1- start) start 'read-only state))
+        (setq pos end))
+      (setq pos (point-min))
+      (while (setq start (next-single-property-change
+                          pos 'wgrep-context-separator))
+        (setq end (next-single-property-change
+                   start 'wgrep-context-separator))
+        (put-text-property start end 'read-only state)
         ;; set readonly all newline at end of grep line
         (when (eq (char-before start) ?\n)
           (put-text-property (1- start) start 'read-only state))
@@ -516,7 +526,6 @@ These changes are not immediately saved to disk unless
   (interactive)
   (wgrep-cleanup-overlays (point-min) (point-max)))
 
-;;TODO "--" context separator
 (defun wgrep-toggle-readonly-area ()
   "Toggle read-only area to remove a whole line.
 
@@ -607,36 +616,45 @@ This change will be applied when \\[wgrep-finish-edit]."
          (delete-overlay ov))))))
 
 (defun wgrep-prepare-context ()
-  (wgrep-goto-first-found)
-  (while (not (eobp))
-    (cond
-     ((looking-at wgrep-line-file-regexp)
-      (let ((filename (match-string-no-properties 1))
-            (line (string-to-number (match-string 3)))
-            (start (match-beginning 0))
-            (end (match-end 0))
-            (fstart (match-beginning 1))
-            (fend (match-end 1))
-            (lstart (match-beginning 3))
-            (lend (match-end 3)))
-        ;; check relative path grep result
-        ;; grep result may be --context result with number between 2 colon.
-        ;; ./filename-1-:10:
-        ;; that make misunderstand font-locking
-        (when (file-exists-p filename)
-          (put-text-property start end 'wgrep-line-filename filename)
-          (put-text-property start end 'wgrep-line-number line)
-          ;; handle backward and forward following options.
-          ;; -A (--after-context) -B (--before-context) -C (--context)
-          (save-excursion
-            (wgrep-prepare-context-while filename line nil))
-          (wgrep-prepare-context-while filename line t)
-          ;; end of context output `--'.
-          (forward-line -1))))
-     ((looking-at "^--+$")
-      (put-text-property
-       (line-beginning-position) (line-end-position) 'read-only t)))
-    (forward-line 1)))
+  (save-restriction
+    (let ((start (wgrep-goto-first-found))
+          (end (wgrep-goto-end-of-found))
+          (cache (make-hash-table)))
+      (narrow-to-region start end)
+      (goto-char (point-min))
+      (while (not (eobp))
+        (cond
+         ((looking-at wgrep-line-file-regexp)
+          (let ((filename (match-string-no-properties 1))
+                (line (string-to-number (match-string 3)))
+                (start (match-beginning 0))
+                (end (match-end 0))
+                (fstart (match-beginning 1))
+                (fend (match-end 1))
+                (lstart (match-beginning 3))
+                (lend (match-end 3)))
+            ;; check relative path grep result
+            ;; grep result may be --context result with number between 2 colon.
+            ;; ./filename-1-:10:
+            ;; that make misunderstand font-locking
+            ;; check file existence decrease risk of the misunderstanding.
+            (when (or (gethash filename cache nil)
+                      (and (file-exists-p filename)
+                           (puthash filename t cache)))
+              (put-text-property start end 'wgrep-line-filename filename)
+              (put-text-property start end 'wgrep-line-number line)
+              ;; handle backward and forward following options.
+              ;; -A (--after-context) -B (--before-context) -C (--context)
+              (save-excursion
+                (wgrep-prepare-context-while filename line nil))
+              (wgrep-prepare-context-while filename line t)
+              ;; end of context output `--'.
+              (forward-line -1))))
+         ((looking-at "^--+$")
+          (put-text-property
+           (line-beginning-position) (line-end-position)
+           'wgrep-context-separator t)))
+        (forward-line 1)))))
 
 (defun wgrep-delete-whole-line ()
   (delete-region (line-beginning-position) (line-beginning-position 2)))

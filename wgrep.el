@@ -150,10 +150,10 @@
 (defface wgrep-reject-face
   '((((class color)
       (background dark))
-     (:foreground "hot pink" :weight bold))
+     (:foreground "HotPink" :weight bold))
     (((class color)
       (background light))
-     (:foreground "red" :weight bold))
+     (:foreground "Red" :weight bold))
     (t
      ()))
   "*Face used for the line in the grep buffer that can not be applied to
@@ -166,7 +166,7 @@ a file."
      (:foreground "LightSkyBlue"))
     (((class color)
       (background light))
-     (:foreground "blue"))
+     (:foreground "Blue"))
     (t
      ()))
   "*Face used for the line in the grep buffer that can be applied to a file."
@@ -193,6 +193,8 @@ a file."
 That capture 1: filename 3: line-number
 End of this match equals start of file contents.
 ")
+(defvar wgrep-results-parser 'wgrep-prepare-command-results)
+
 (defvar wgrep-inhibit-modification-hook nil)
 
 (defvar wgrep-mode-map nil)
@@ -216,10 +218,10 @@ End of this match equals start of file contents.
 (defun wgrep-setup ()
   "Setup wgrep preparation."
   (define-key grep-mode-map wgrep-enable-key 'wgrep-change-to-wgrep-mode)
+  (add-to-list 'wgrep-acceptable-modes 'grep-mode)
   (wgrep-setup-internal))
 
 (defun wgrep-setup-internal ()
-  (add-to-list 'wgrep-acceptable-modes major-mode)
   ;; delete previous wgrep overlays
   (wgrep-cleanup-overlays (point-min) (point-max))
   (remove-hook 'post-command-hook 'wgrep-maybe-echo-error-at-point t)
@@ -618,43 +620,46 @@ This change will be applied when \\[wgrep-finish-edit]."
 (defun wgrep-prepare-context ()
   (save-restriction
     (let ((start (wgrep-goto-first-found))
-          (end (wgrep-goto-end-of-found))
-          (cache (make-hash-table)))
+          (end (wgrep-goto-end-of-found)))
       (narrow-to-region start end)
       (goto-char (point-min))
-      (while (not (eobp))
-        (cond
-         ((looking-at wgrep-line-file-regexp)
-          (let ((filename (match-string-no-properties 1))
-                (line (string-to-number (match-string 3)))
-                (start (match-beginning 0))
-                (end (match-end 0))
-                (fstart (match-beginning 1))
-                (fend (match-end 1))
-                (lstart (match-beginning 3))
-                (lend (match-end 3)))
-            ;; check relative path grep result
-            ;; grep result may be --context result with number between 2 colon.
-            ;; ./filename-1-:10:
-            ;; that make misunderstand font-locking
-            ;; check file existence decrease risk of the misunderstanding.
-            (when (or (gethash filename cache nil)
-                      (and (file-exists-p filename)
-                           (puthash filename t cache)))
-              (put-text-property start end 'wgrep-line-filename filename)
-              (put-text-property start end 'wgrep-line-number line)
-              ;; handle backward and forward following options.
-              ;; -A (--after-context) -B (--before-context) -C (--context)
-              (save-excursion
-                (wgrep-prepare-context-while filename line nil))
-              (wgrep-prepare-context-while filename line t)
-              ;; end of context output `--'.
-              (forward-line -1))))
-         ((looking-at "^--+$")
-          (put-text-property
-           (line-beginning-position) (line-end-position)
-           'wgrep-context-separator t)))
-        (forward-line 1)))))
+      (funcall wgrep-results-parser))))
+
+(defun wgrep-prepare-command-results ()
+  (let ((cache (make-hash-table)))
+    (while (not (eobp))
+      (cond
+       ((looking-at wgrep-line-file-regexp)
+        (let ((filename (match-string-no-properties 1))
+              (line (string-to-number (match-string 3)))
+              (start (match-beginning 0))
+              (end (match-end 0))
+              (fstart (match-beginning 1))
+              (fend (match-end 1))
+              (lstart (match-beginning 3))
+              (lend (match-end 3)))
+          ;; check relative path grep result
+          ;; grep result may be --context result with number between 2 colon.
+          ;; ./filename-1-:10:
+          ;; that make misunderstand font-locking
+          ;; check file existence decrease risk of the misunderstanding.
+          (when (or (gethash filename cache nil)
+                    (and (file-exists-p filename)
+                         (puthash filename t cache)))
+            (put-text-property start end 'wgrep-line-filename filename)
+            (put-text-property start end 'wgrep-line-number line)
+            ;; handle backward and forward following options.
+            ;; -A (--after-context) -B (--before-context) -C (--context)
+            (save-excursion
+              (wgrep-prepare-context-while filename line nil))
+            (wgrep-prepare-context-while filename line t)
+            ;; end of context output `--'.
+            (forward-line -1))))
+       ((looking-at "^--+$")
+        (put-text-property
+         (line-beginning-position) (line-end-position)
+         'wgrep-context-separator t)))
+      (forward-line 1))))
 
 (defun wgrep-delete-whole-line ()
   (delete-region (line-beginning-position) (line-beginning-position 2)))
@@ -715,7 +720,9 @@ This change will be applied when \\[wgrep-finish-edit]."
         (put-text-property beg end 'read-only t)
         (put-text-property beg end 'wgrep-header t)
         ;; Set read-only grep result footer
-        (re-search-forward "^$" nil t)
+        (goto-char (point-max))
+        (forward-line -1)
+        (re-search-backward "^$" nil t)
         (setq beg (point))
         (setq end (point-max))
         (when beg

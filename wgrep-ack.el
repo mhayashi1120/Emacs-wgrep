@@ -50,7 +50,7 @@
 (require 'wgrep)
 
 ;;;###autoload
-(defun wgrep-ack-setup ()
+(defun wgrep-ack-and-a-half-setup ()
   ;; ack-and-a-half-mode prints a column number too, so we catch that
   ;; if it exists.  Here \2 is a colon + whitespace separator.  This
   ;; might need to change if (caar grep-regexp-alist) does.
@@ -60,14 +60,15 @@
         "\\(?:\\([1-9][0-9]*\\)\\2\\)?"))
   (define-key ack-and-a-half-mode-map
     wgrep-enable-key 'wgrep-change-to-wgrep-mode)
+  (add-to-list 'wgrep-acceptable-modes 'ack-and-a-half-mode)
   (wgrep-setup-internal))
 
-;;;###autoload(add-hook 'ack-and-a-half-mode-hook 'wgrep-ack-setup)
-(add-hook 'ack-and-a-half-mode-hook 'wgrep-ack-setup)
+;;;###autoload(add-hook 'ack-and-a-half-mode-hook 'wgrep-ack-and-a-half-setup)
+(add-hook 'ack-and-a-half-mode-hook 'wgrep-ack-and-a-half-setup)
 
 ;; For `unload-feature'
 (defun wgrep-ack-unload-function ()
-  (remove-hook 'ack-and-a-half-mode-hook 'wgrep-ack-setup))
+  (remove-hook 'ack-and-a-half-mode-hook 'wgrep-ack-and-a-half-setup))
 
 (provide 'wgrep-ack)
 

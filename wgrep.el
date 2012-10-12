@@ -193,7 +193,7 @@ a file."
 That capture 1: filename 3: line-number
 End of this match equals start of file contents.
 ")
-(defvar wgrep-results-parser 'wgrep-prepare-command-results)
+(defvar wgrep-results-parser 'wgrep-parse-command-results)
 
 (defvar wgrep-inhibit-modification-hook nil)
 
@@ -257,9 +257,9 @@ End of this match equals start of file contents.
         (setq pos end))
       (setq pos (point-min))
       (while (setq start (next-single-property-change
-                          pos 'wgrep-context-separator))
+                          pos 'wgrep-ignore))
         (setq end (next-single-property-change
-                   start 'wgrep-context-separator))
+                   start 'wgrep-ignore))
         (put-text-property start end 'read-only state)
         ;; set readonly all newline at end of grep line
         (when (eq (char-before start) ?\n)
@@ -625,7 +625,7 @@ This change will be applied when \\[wgrep-finish-edit]."
       (goto-char (point-min))
       (funcall wgrep-results-parser))))
 
-(defun wgrep-prepare-command-results ()
+(defun wgrep-parse-command-results ()
   (let ((cache (make-hash-table)))
     (while (not (eobp))
       (cond
@@ -658,7 +658,7 @@ This change will be applied when \\[wgrep-finish-edit]."
        ((looking-at "^--+$")
         (put-text-property
          (line-beginning-position) (line-end-position)
-         'wgrep-context-separator t)))
+         'wgrep-ignore t)))
       (forward-line 1))))
 
 (defun wgrep-delete-whole-line ()
@@ -770,7 +770,7 @@ This change will be applied when \\[wgrep-finish-edit]."
          (buffer-live-p wgrep-sibling-buffer))
     (let ((grepbuf (current-buffer))
           (tmpbuf wgrep-sibling-buffer)
-          (savedh (wgrep-current-header))
+          (header (wgrep-current-file-and-linum))
           (savedc (current-column))
           (savedp (point))
           (inhibit-read-only t)
@@ -780,8 +780,9 @@ This change will be applied when \\[wgrep-finish-edit]."
       (with-current-buffer tmpbuf
         (append-to-buffer grepbuf (point-min) (point-max)))
       (goto-char (point-min))
-      (or (and savedh
-               (re-search-forward (concat "^" (regexp-quote savedh)) nil t)
+      ;; restore previous cursor
+      (or (and header
+               (apply 'wgrep-goto-grep-line header)
                (move-to-column savedc))
           (goto-char (min (point-max) savedp)))
       (wgrep-cleanup-temp-buffer)))
@@ -799,29 +800,50 @@ This change will be applied when \\[wgrep-finish-edit]."
             (kill-buffer buf)))))
     (setq wgrep-sibling-buffer nil)))
 
-(defun wgrep-current-header ()
+(defun wgrep-current-file-and-linum ()
   (save-excursion
     (forward-line 0)
-    (let ((f (get-text-property (point) 'wgrep-line-filename))
-          (n (get-text-property (point) 'wgrep-line-number)))
-      (when (and f n)
-        (format "^%s\\([:-]\\)%s\\1" f n)))))
+    (let ((fn (get-text-property (point) 'wgrep-line-filename))
+          (linum (get-text-property (point) 'wgrep-line-number)))
+      (when (and fn linum)
+        (list fn linum)))))
 
 (defun wgrep-get-old-text (file number)
   (when (and wgrep-sibling-buffer
              (buffer-live-p wgrep-sibling-buffer))
     (with-current-buffer wgrep-sibling-buffer
-      (goto-char (point-min))
-      (let ((regexp (concat "^" file)))
-        (catch 'found
-          (while (re-search-forward regexp nil t)
-            (let ((f (get-text-property (point) 'wgrep-line-filename))
-                  (n (get-text-property (point) 'wgrep-line-number))
-                  (start (next-single-property-change (point) 'wgrep-line-filename)))
-              (when (and (string= f file) (eq number n))
-                (throw 'found
-                       (buffer-substring-no-properties
-                        start (line-end-position)))))))))))
+      (when (wgrep-goto-grep-line file number)
+        (buffer-substring-no-properties
+         (point) (line-end-position))))))
+
+(defun wgrep-goto-grep-line (file number)
+  (let ((regexp (concat "^" (regexp-quote file)))
+        (first (point))
+        fn)
+    (goto-char (point-min))
+    (catch 'found
+      ;; FIXME
+      ;; In a huge buffer, `next-single-property-change' loop make
+      ;; slow down the program.
+      ;; 1. sketchy move by filename.
+      ;; 2. search filename and line-number in text property.
+      ;; 3. return to 1. while search is done or EOB.
+
+      (while (re-search-forward regexp nil t)
+        (while (and (not (eobp))
+                    (or (null (setq fn (get-text-property
+                                        (line-beginning-position)
+                                        'wgrep-line-filename)))
+                        (string= fn file)))
+          (when fn
+            (let ((num (get-text-property (point) 'wgrep-line-number))
+                  (start (next-single-property-change (point) 'wgrep-line-number)))
+              (when (and  (eq number num))
+                (goto-char start)
+                (throw 'found t))))
+          (forward-line 1)))
+      (goto-char first)
+      nil)))
 
 ;; return alist like following
 ;; key ::= buffer

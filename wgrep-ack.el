@@ -54,7 +54,7 @@
   ;; ack-and-a-half-mode prints a column number too, so we catch that
   ;; if it exists.  Here \2 is a colon + whitespace separator.  This
   ;; might need to change if (caar grep-regexp-alist) does.
-  (set (make-variable-buffer-local 'wgrep-line-file-regexp)
+  (set (make-local-variable 'wgrep-line-file-regexp)
        (concat
         (caar grep-regexp-alist)
         "\\(?:\\([1-9][0-9]*\\)\\2\\)?"))
@@ -63,12 +63,47 @@
   (add-to-list 'wgrep-acceptable-modes 'ack-and-a-half-mode)
   (wgrep-setup-internal))
 
+;;;###autoload
+(defun wgrep-ack-setup ()
+  (set (make-local-variable 'wgrep-results-parser)
+       'wgrep-ack-prepare-command-results)
+  (define-key ack-mode-map
+    wgrep-enable-key 'wgrep-change-to-wgrep-mode)
+  (add-to-list 'wgrep-acceptable-modes 'ack-mode)
+  (wgrep-setup-internal))
+
+(defun wgrep-ack-prepare-command-results ()
+  (let (file)
+    (while (not (eobp))
+      (cond
+       ((null file)
+        ;; index of filename
+        (let ((bol (line-beginning-position))
+              (eol (line-end-position)))
+          (when (/= bol eol)
+            (setq file
+                  (buffer-substring-no-properties bol eol))
+            (put-text-property bol eol 'wgrep-ignore t))))
+       ((looking-at "^\\([0-9]+\\)[:-]")
+        (let ((start (match-beginning 0))
+              (end (match-end 0))
+              (line (string-to-number (match-string 1))))
+          (put-text-property start end 'wgrep-line-filename file)
+          (put-text-property start end 'wgrep-line-number line)))
+       ((looking-at "^$")
+        (setq file nil)))
+      (forward-line 1))))
+
 ;;;###autoload(add-hook 'ack-and-a-half-mode-hook 'wgrep-ack-and-a-half-setup)
 (add-hook 'ack-and-a-half-mode-hook 'wgrep-ack-and-a-half-setup)
 
+;;;###autoload(add-hook 'ack-mode-hook 'wgrep-ack-setup)
+(add-hook 'ack-mode-hook 'wgrep-ack-setup)
+
 ;; For `unload-feature'
 (defun wgrep-ack-unload-function ()
-  (remove-hook 'ack-and-a-half-mode-hook 'wgrep-ack-and-a-half-setup))
+  (remove-hook 'ack-and-a-half-mode-hook 'wgrep-ack-and-a-half-setup)
+  (remove-hook 'ack-mode-hook 'wgrep-ack-setup))
 
 (provide 'wgrep-ack)
 

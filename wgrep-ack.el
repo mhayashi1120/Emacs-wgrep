@@ -49,6 +49,9 @@
 
 (require 'wgrep)
 
+(defvar ack-and-a-half-mode-map)
+(defvar ack-mode-map)
+
 ;;;###autoload
 (defun wgrep-ack-and-a-half-setup ()
   ;; ack-and-a-half-mode prints a column number too, so we catch that

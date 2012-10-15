@@ -76,10 +76,11 @@
     (wgrep-change-to-wgrep-mode)
     (goto-char (point-min))
     ;; BOM check is valid.
+    ;; skip BOM by `.*'
     (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(あ\\)$" nil t))
     (replace-match "へのへのも" nil nil nil 1)
     ;; 2nd line
-    (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(い\\)$" nil t))
+    (should (re-search-forward "test-data\\.txt-[0-9]+-\\(い\\)$" nil t))
     (replace-match "へじ" nil nil nil 1)
     ;; apply to buffer
     (wgrep-finish-edit)
@@ -125,10 +126,10 @@
     (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(a\\)$" nil t))
     (wgrep-mark-deletion)
     ;; replace "b" line (failed when saving)
-    (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(b\\)$" nil t))
+    (should (re-search-forward "test-data\\.txt-[0-9]+-.*\\(b\\)$" nil t))
     (replace-match "B" nil nil nil 1)
     ;; replace "c" line
-    (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(c\\)$" nil t))
+    (should (re-search-forward "test-data\\.txt-[0-9]+-.*\\(c\\)$" nil t))
     (replace-match "C" nil nil nil 1)
     ;; apply to buffer
     (wgrep-finish-edit)

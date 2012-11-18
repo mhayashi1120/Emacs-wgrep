@@ -98,7 +98,7 @@
   :group 'wgrep
   :type 'boolean)
 
-(defcustom wgrep-enable-key "\C-c\C-p"
+(defcustom wgrep-enable-key "\C-x\C-q"
   "Key to enable `wgrep-mode'."
   :group 'wgrep
   :type 'string)

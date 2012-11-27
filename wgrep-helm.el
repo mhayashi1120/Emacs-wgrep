@@ -1,0 +1,76 @@
+;;; wgrep-helm.el --- Writable helm-grep-mode buffer and apply the changes to files
+
+;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
+;; Keywords: grep edit extensions
+;; Package-Requires: ((wgrep "2.1.1"))
+;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-helm.el
+;; Emacs: GNU Emacs 22 or later
+;; Version: 0.1.0
+
+;; This program is free software; you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License as
+;; published by the Free Software Foundation; either version 3, or (at
+;; your option) any later version.
+
+;; This program is distributed in the hope that it will be useful, but
+;; WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;; General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with GNU Emacs; see the file COPYING.  If not, write to the
+;; Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+;; Boston, MA 02110-1301, USA.
+
+;;; Commentary:
+
+;; wgrep-helm allows you to edit a helm-grep-mode buffer and apply those
+;; changes to the file buffer.
+
+;;; Install:
+
+;; Put this file into load-path'ed directory, and byte compile it if
+;; desired. And put the following expression into your ~/.emacs.
+;;
+;;     (require 'wgrep-helm)
+
+;;; Usage:
+
+;; See wgrep.el
+
+;;; Code:
+
+(require 'wgrep)
+
+;;;###autoload
+(defun wgrep-helm-setup ()
+  (set (make-local-variable 'wgrep-header/footer-parser)
+       'wgrep-helm-prepare-header/footer)
+  (define-key helm-grep-mode-map
+    wgrep-enable-key 'wgrep-change-to-wgrep-mode)
+  (add-to-list 'wgrep-acceptable-modes 'helm-grep-mode)
+  (wgrep-setup-internal))
+
+(defun wgrep-helm-prepare-header/footer ()
+  (let (beg end)
+    ;; Set read-only grep result header
+    (setq beg (point-min))
+    ;; See `helm-c-grep-save-results-1'
+    (goto-char (point-min))
+    (forward-line 4)
+    (setq end (point))
+    (put-text-property beg end 'read-only t)
+    (put-text-property beg end 'wgrep-header t)
+    ;; helm-grep-mode have NO footer.
+    ))
+
+;;;###autoload(add-hook 'helm-grep-mode-hook 'wgrep-helm-setup)
+(add-hook 'helm-grep-mode-hook 'wgrep-helm-setup)
+
+;; For `unload-feature'
+(defun wgrep-helm-unload-function ()
+  (remove-hook 'helm-grep-mode-hook 'wgrep-helm-setup))
+
+(provide 'wgrep-helm)
+
+;;; wgrep-helm.el ends here

@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 2.1.0
+;; Version: 2.1.1
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -194,6 +194,7 @@ That capture 1: filename 3: line-number
 End of this match equals start of file contents.
 ")
 (defvar wgrep-results-parser 'wgrep-parse-command-results)
+(defvar wgrep-header/footer-parser 'wgrep-prepare-header/footer)
 
 (defvar wgrep-inhibit-modification-hook nil)
 
@@ -666,15 +667,23 @@ This change will be applied when \\[wgrep-finish-edit]."
 
 (defun wgrep-goto-first-found ()
   (let ((header (previous-single-property-change (point-max) 'wgrep-header)))
-    (when header
+    (cond
+     (header
       (goto-char header)
-      header)))
+      header)
+     (t
+      (goto-char (point-min))
+      (point)))))
 
 (defun wgrep-goto-end-of-found ()
   (let ((footer (next-single-property-change (point-min) 'wgrep-footer)))
-    (when footer
+    (cond
+     (footer
       (goto-char footer)
-      footer)))
+      footer)
+     (t
+      (goto-char (point-max))
+      (point-max)))))
 
 (defun wgrep-goto-line (line)
   (goto-char (point-min))
@@ -710,26 +719,30 @@ This change will be applied when \\[wgrep-finish-edit]."
     (save-excursion
       (let ((inhibit-read-only t)
             (wgrep-inhibit-modification-hook t)
-            buffer-read-only beg end)
-        ;; Set read-only grep result header
-        (goto-char (point-min))
-        (setq beg (point-min))
-        ;; See `compilation-start'
-        (forward-line 4)
-        (setq end (point))
-        (put-text-property beg end 'read-only t)
-        (put-text-property beg end 'wgrep-header t)
-        ;; Set read-only grep result footer
-        (goto-char (point-max))
-        (forward-line -1)
-        (re-search-backward "^$" nil t)
-        (setq beg (point))
-        (setq end (point-max))
-        (when beg
-          (put-text-property beg end 'read-only t)
-          (put-text-property beg end 'wgrep-footer t))
+            buffer-read-only)
+        (funcall wgrep-header/footer-parser)
         (wgrep-prepare-context)
         (setq wgrep-prepared t)))))
+
+(defun wgrep-prepare-header/footer ()
+  (let (beg end)
+    ;; Set read-only grep result header
+    (goto-char (point-min))
+    (setq beg (point-min))
+    ;; See `compilation-start'
+    (forward-line 4)
+    (setq end (point))
+    (put-text-property beg end 'read-only t)
+    (put-text-property beg end 'wgrep-header t)
+    ;; Set read-only grep result footer
+    (goto-char (point-max))
+    (forward-line -1)
+    (re-search-backward "^$" nil t)
+    (setq beg (point))
+    (setq end (point-max))
+    (when beg
+      (put-text-property beg end 'read-only t)
+      (put-text-property beg end 'wgrep-footer t))))
 
 (defun wgrep-set-header/footer-read-only (state)
   (let ((inhibit-read-only t)

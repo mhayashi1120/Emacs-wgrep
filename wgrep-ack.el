@@ -61,14 +61,12 @@
        (concat
         (caar grep-regexp-alist)
         "\\(?:\\([1-9][0-9]*\\)\\2\\)?"))
-  (add-to-list 'wgrep-acceptable-modes 'ack-and-a-half-mode)
   (wgrep-setup-internal))
 
 ;;;###autoload
 (defun wgrep-ack-setup ()
   (set (make-local-variable 'wgrep-results-parser)
        'wgrep-ack-prepare-command-results)
-  (add-to-list 'wgrep-acceptable-modes 'ack-mode)
   (wgrep-setup-internal))
 
 (defun wgrep-ack-prepare-command-results ()

@@ -46,7 +46,6 @@
 (defun wgrep-helm-setup ()
   (set (make-local-variable 'wgrep-header/footer-parser)
        'wgrep-helm-prepare-header/footer)
-  (add-to-list 'wgrep-acceptable-modes 'helm-grep-mode)
   (wgrep-setup-internal))
 
 (defun wgrep-helm-prepare-header/footer ()

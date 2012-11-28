@@ -188,8 +188,6 @@ a file."
 ;; GNU Emacs have this variable at least version 21 or later
 (defvar auto-coding-regexp-alist)
 
-(defvar wgrep-acceptable-modes nil)
-
 (defvar wgrep-line-file-regexp (caar grep-regexp-alist)
   "Regexp that match to line header of grep result.
 
@@ -221,7 +219,6 @@ End of this match equals start of file contents.
 ;;;###autoload
 (defun wgrep-setup ()
   "Setup wgrep preparation."
-  (add-to-list 'wgrep-acceptable-modes 'grep-mode)
   (wgrep-setup-internal))
 
 (defun wgrep-setup-internal ()
@@ -565,8 +562,6 @@ When the *grep* buffer is huge, this might freeze your Emacs
 for several minutes.
 "
   (interactive)
-  (unless (memq major-mode wgrep-acceptable-modes)
-    (error "Not a wgrep editable buffer"))
   (unless (wgrep-process-exited-p)
     (error "Active process working"))
   (wgrep-prepare-to-edit)

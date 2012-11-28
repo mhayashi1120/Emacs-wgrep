@@ -42,10 +42,16 @@
 
 (require 'wgrep)
 
+;;TODO
+(defconst wgrep-helm-realvalue-regexp
+  "\\`\\(\\(?:[a-zA-Z]:\\)?[^:]+\\):\\([0-9]+\\)\\'")
+
 ;;;###autoload
 (defun wgrep-helm-setup ()
   (set (make-local-variable 'wgrep-header/footer-parser)
        'wgrep-helm-prepare-header/footer)
+  (set (make-local-variable 'wgrep-results-parser)
+       'wgrep-helm-parse-command-results)
   (wgrep-setup-internal))
 
 (defun wgrep-helm-prepare-header/footer ()
@@ -58,6 +64,26 @@
     (put-text-property beg end 'wgrep-header t)
     ;; helm-grep-mode have NO footer.
     ))
+
+(defun wgrep-helm-parse-command-results ()
+  (let (next)
+    (catch 'done
+      (while t
+        ;;TODO windows path.
+        (when (looking-at wgrep-line-file-regexp)
+          (let ((start (match-beginning 0))
+                (end (match-end 0)))
+            (let ((value (get-text-property (point) 'helm-realvalue)))
+              (when (string-match wgrep-helm-realvalue-regexp value)
+                (let ((filename (match-string-no-properties 1 value))
+                      (line (string-to-number (match-string 3 value))))
+                  (put-text-property start end 'wgrep-line-filename filename)
+                  (put-text-property start end 'wgrep-line-number line))))))
+        (setq next (next-single-property-change
+                    (point) 'helm-realvalue))
+        (unless next
+          (throw 'done t))
+        (goto-char next)))))
 
 ;;;###autoload(add-hook 'helm-grep-mode-hook 'wgrep-helm-setup)
 (add-hook 'helm-grep-mode-hook 'wgrep-helm-setup)

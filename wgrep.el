@@ -181,6 +181,9 @@ a file."
 (defvar wgrep-sibling-buffer nil)
 (make-variable-buffer-local 'wgrep-sibling-buffer)
 
+(defvar wgrep-original-mode-map nil)
+(make-variable-buffer-local 'wgrep-original-mode-map)
+
 ;; Suppress elint warning
 ;; GNU Emacs have this variable at least version 21 or later
 (defvar auto-coding-regexp-alist)
@@ -218,11 +221,13 @@ End of this match equals start of file contents.
 ;;;###autoload
 (defun wgrep-setup ()
   "Setup wgrep preparation."
-  (define-key grep-mode-map wgrep-enable-key 'wgrep-change-to-wgrep-mode)
   (add-to-list 'wgrep-acceptable-modes 'grep-mode)
   (wgrep-setup-internal))
 
 (defun wgrep-setup-internal ()
+  (setq wgrep-original-mode-map (current-local-map))
+  (define-key wgrep-original-mode-map
+    wgrep-enable-key 'wgrep-change-to-wgrep-mode)
   ;; delete previous wgrep overlays
   (wgrep-cleanup-overlays (point-min) (point-max))
   (remove-hook 'post-command-hook 'wgrep-maybe-echo-error-at-point t)
@@ -466,12 +471,12 @@ End of this match equals start of file contents.
         (overlay-put ov 'wgrep-edit-text value))))
     ov))
 
-(defun wgrep-to-grep-mode ()
+(defun wgrep-to-original-mode ()
   (kill-local-variable 'query-replace-skip-read-only)
   (remove-hook 'after-change-functions 'wgrep-after-change-function t)
   ;; do not remove `wgrep-maybe-echo-error-at-point' that display
   ;; errors at point
-  (use-local-map grep-mode-map)
+  (use-local-map wgrep-original-mode-map)
   (set-buffer-modified-p nil)
   (setq buffer-undo-list nil)
   (setq buffer-read-only t))
@@ -487,7 +492,7 @@ These changes are not immediately saved to disk unless
       (let ((commited (wgrep-commit-buffer (car buf-tran) (cdr buf-tran))))
         (setq done (append done commited))))
     (wgrep-cleanup-temp-buffer)
-    (wgrep-to-grep-mode)
+    (wgrep-to-original-mode)
     (let ((msg (format "(%d changed)" (length done)))
           (ovs (wgrep-edit-overlays)))
       (cond
@@ -502,7 +507,7 @@ These changes are not immediately saved to disk unless
                  (length ovs) msg))))))
 
 (defun wgrep-exit ()
-  "Return to `grep-mode'"
+  "Return to original mode."
   (interactive)
   (if (and (buffer-modified-p)
            (y-or-n-p (format "Buffer %s modified; save changes? "
@@ -511,11 +516,11 @@ These changes are not immediately saved to disk unless
     (wgrep-abort-changes)))
 
 (defun wgrep-abort-changes ()
-  "Discard all changes and return to `grep-mode'"
+  "Discard all changes and return to original mode."
   (interactive)
   (wgrep-cleanup-overlays (point-min) (point-max))
   (wgrep-restore-from-temp-buffer)
-  (wgrep-to-grep-mode)
+  (wgrep-to-original-mode)
   (message "Changes discarded"))
 
 (defun wgrep-remove-change (beg end)
@@ -805,13 +810,12 @@ This change will be applied when \\[wgrep-finish-edit]."
 
 (defun wgrep-cleanup-temp-buffer ()
   "Cleanup temp buffer in *grep* buffer."
-  (when (memq major-mode '(grep-mode))
-    (let ((grep-buffer (current-buffer)))
-      (dolist (buf (buffer-list))
-        (with-current-buffer buf
-          (when (eq grep-buffer wgrep-sibling-buffer)
-            (kill-buffer buf)))))
-    (setq wgrep-sibling-buffer nil)))
+  (let ((origin-buffer (current-buffer)))
+    (dolist (buf (buffer-list))
+      (with-current-buffer buf
+        (when (eq origin-buffer wgrep-sibling-buffer)
+          (kill-buffer buf)))))
+  (setq wgrep-sibling-buffer nil))
 
 (defun wgrep-current-file-and-linum ()
   (save-excursion

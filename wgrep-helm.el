@@ -46,8 +46,6 @@
 (defun wgrep-helm-setup ()
   (set (make-local-variable 'wgrep-header/footer-parser)
        'wgrep-helm-prepare-header/footer)
-  (define-key helm-grep-mode-map
-    wgrep-enable-key 'wgrep-change-to-wgrep-mode)
   (add-to-list 'wgrep-acceptable-modes 'helm-grep-mode)
   (wgrep-setup-internal))
 
@@ -55,10 +53,8 @@
   (let (beg end)
     ;; Set read-only grep result header
     (setq beg (point-min))
-    ;; See `helm-c-grep-save-results-1'
-    (goto-char (point-min))
-    (forward-line 4)
-    (setq end (point))
+    (setq end (next-single-property-change
+               (point-min) 'helm-realvalue))
     (put-text-property beg end 'read-only t)
     (put-text-property beg end 'wgrep-header t)
     ;; helm-grep-mode have NO footer.

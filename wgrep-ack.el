@@ -70,25 +70,26 @@
   (wgrep-setup-internal))
 
 (defun wgrep-ack-prepare-command-results ()
-  (let (file)
+  (let (fprop fn)
     (while (not (eobp))
       (cond
-       ((null file)
+       ((null fn)
         ;; index of filename
         (let ((bol (line-beginning-position))
               (eol (line-end-position)))
           (when (/= bol eol)
-            (setq file
-                  (buffer-substring-no-properties bol eol))
+            (setq fn (buffer-substring-no-properties bol eol))
+            (setq fprop (wgrep-construct-filename-property fn))
+            (put-text-property bol eol fprop fn)
             (put-text-property bol eol 'wgrep-ignore t))))
        ((looking-at "^\\([0-9]+\\)[:-]")
         (let ((start (match-beginning 0))
               (end (match-end 0))
               (line (string-to-number (match-string 1))))
-          (put-text-property start end 'wgrep-line-filename file)
+          (put-text-property start end 'wgrep-line-filename fn)
           (put-text-property start end 'wgrep-line-number line)))
        ((looking-at "^$")
-        (setq file nil)))
+        (setq fn nil)))
       (forward-line 1))))
 
 ;;;###autoload(add-hook 'ack-and-a-half-mode-hook 'wgrep-ack-and-a-half-setup)

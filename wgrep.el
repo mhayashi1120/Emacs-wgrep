@@ -631,32 +631,35 @@ This change will be applied when \\[wgrep-finish-edit]."
     (while (not (eobp))
       (cond
        ((looking-at wgrep-line-file-regexp)
-        (let ((filename (match-string-no-properties 1))
-              (line (string-to-number (match-string 3)))
-              (start (match-beginning 0))
-              (end (match-end 0))
-              (fstart (match-beginning 1))
-              (fend (match-end 1))
-              (lstart (match-beginning 3))
-              (lend (match-end 3)))
+        (let* ((fn (match-string-no-properties 1))
+               (line (string-to-number (match-string 3)))
+               (start (match-beginning 0))
+               (end (match-end 0))
+               (fstart (match-beginning 1))
+               (fend (match-end 1))
+               (lstart (match-beginning 3))
+               (lend (match-end 3))
+               (fprop (wgrep-construct-filename-property fn))
+               (flen (length fn)))
           ;; check relative path grep result
           ;; grep result may be --context result with number between 2 colon.
           ;; ./filename-1-:10:
           ;; that make misunderstand font-locking
           ;; check file existence decrease risk of the misunderstanding.
-          (when (or (gethash filename cache nil)
-                    (and (file-exists-p filename)
-                         (puthash filename t cache)))
-            (put-text-property start end 'wgrep-line-filename filename)
+          (when (or (gethash fn cache nil)
+                    (and (file-exists-p fn)
+                         (puthash fn t cache)))
+            (put-text-property start end 'wgrep-line-filename fn)
             (put-text-property start end 'wgrep-line-number line)
+            (put-text-property start (+ start flen) fprop fn)
             ;; handle backward and forward following options.
             ;; -A (--after-context) -B (--before-context) -C (--context)
             (save-excursion
-              (wgrep-prepare-context-while filename line nil))
-            (wgrep-prepare-context-while filename line t)
+              (wgrep-prepare-context-while fn line -1 fprop flen))
+            (wgrep-prepare-context-while fn line 1 fprop flen)
             ;; end of context output `--'.
             (forward-line -1))))
-       ((looking-at "^--+$")
+       (t
         (put-text-property
          (line-beginning-position) (line-end-position)
          'wgrep-ignore t)))
@@ -695,19 +698,22 @@ This change will be applied when \\[wgrep-finish-edit]."
 ;; filename-1-2010-01-01 23:59:99
 ;; filename:2:hoge
 ;; filename-3-20:10:25
-(defun wgrep-prepare-context-while (filename line forward)
-  (let* ((direction (if forward 1 -1))
-         (next (+ direction line))
+(defun wgrep-prepare-context-while (filename line direction fprop flen)
+  (let* ((next (+ direction line))
          (fregexp (regexp-quote filename)))
     (forward-line direction)
     (while (looking-at (format "^%s-%d-" fregexp next))
-      (let ((line-head (format "%s:%d:" filename next))
-            (start (match-beginning 0))
+      (let ((start (match-beginning 0))
             (end (match-end 0)))
         (put-text-property start end 'wgrep-line-filename filename)
         (put-text-property start end 'wgrep-line-number next)
+        (put-text-property start (+ start flen) fprop filename)
         (forward-line direction)
         (setq next (+ direction next))))))
+
+;;TODO make keyname of this property's value
+(defun wgrep-construct-filename-property (filename)
+  (intern (format "wgrep-fn-%s" filename)))
 
 (defun wgrep-process-exited-p ()
   (let ((proc (get-buffer-process (current-buffer))))
@@ -829,10 +835,9 @@ This change will be applied when \\[wgrep-finish-edit]."
          (point) (line-end-position))))))
 
 (defun wgrep-goto-grep-line (file number)
-  (let ((regexp (concat "^" (regexp-quote file)))
-        (first (point))
-        fn)
-    (goto-char (point-min))
+  (let ((first (point))
+        (fprop (wgrep-construct-filename-property file))
+        next)
     (catch 'found
       ;; FIXME
       ;; In a huge buffer, `next-single-property-change' loop make
@@ -841,19 +846,15 @@ This change will be applied when \\[wgrep-finish-edit]."
       ;; 2. search filename and line-number in text property.
       ;; 3. return to 1. while search is done or EOB.
 
-      (while (re-search-forward regexp nil t)
-        (while (and (not (eobp))
-                    (or (null (setq fn (get-text-property
-                                        (line-beginning-position)
-                                        'wgrep-line-filename)))
-                        (string= fn file)))
-          (when fn
-            (let ((num (get-text-property (point) 'wgrep-line-number))
-                  (start (next-single-property-change (point) 'wgrep-line-number)))
-              (when (and  (eq number num))
-                (goto-char start)
-                (throw 'found t))))
-          (forward-line 1)))
+      (goto-char (point-min))
+
+      (while (setq next (next-single-property-change (point) fprop))
+        (goto-char next)
+        (let ((num (get-text-property (point) 'wgrep-line-number))
+              (start (next-single-property-change (point) 'wgrep-line-number)))
+          (when (eq number num)
+            (goto-char start)
+            (throw 'found t))))
       (goto-char first)
       nil)))
 

@@ -188,6 +188,9 @@ a file."
 ;; GNU Emacs have this variable at least version 21 or later
 (defvar auto-coding-regexp-alist)
 
+(defvar wgrep-acceptable-modes nil)
+(make-obsolete 'wgrep-acceptable-modes nil "2.1.1")
+
 (defvar wgrep-line-file-regexp (caar grep-regexp-alist)
   "Regexp that match to line header of grep result.
 
@@ -711,7 +714,6 @@ This change will be applied when \\[wgrep-finish-edit]."
         (forward-line direction)
         (setq next (+ direction next))))))
 
-;;TODO make keyname of this property's value
 (defun wgrep-construct-filename-property (filename)
   (intern (format "wgrep-fn-%s" filename)))
 

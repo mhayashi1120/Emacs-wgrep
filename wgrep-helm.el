@@ -44,10 +44,6 @@
 
 (declare-function helm-c-grep-split-line "helm-grep")
 
-;;TODO
-(defconst wgrep-helm-realvalue-regexp
-  "\\`\\(\\(?:[a-zA-Z]:\\)?[^:]+\\):\\([0-9]+\\):")
-
 ;;;###autoload
 (defun wgrep-helm-setup ()
   (set (make-local-variable 'wgrep-header/footer-parser)
@@ -69,7 +65,6 @@
 
 (defun wgrep-helm-parse-command-results ()
   (while (not (eobp))
-    ;;TODO windows path.
     (when (looking-at wgrep-line-file-regexp)
       (let* ((start (match-beginning 0))
              (end (match-end 0))

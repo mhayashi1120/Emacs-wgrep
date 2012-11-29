@@ -42,6 +42,8 @@
 
 (require 'wgrep)
 
+(declare-function helm-c-grep-split-line "helm-grep")
+
 ;;TODO
 (defconst wgrep-helm-realvalue-regexp
   "\\`\\(\\(?:[a-zA-Z]:\\)?[^:]+\\):\\([0-9]+\\):")
@@ -73,14 +75,14 @@
              (end (match-end 0))
              (dispname (match-string 1))
              (namelen (length dispname)))
-        (let ((value (get-text-property (point) 'helm-realvalue)))
-          (when (string-match wgrep-helm-realvalue-regexp value)
-            (let* ((fn (match-string-no-properties 1 value))
-                   (line (string-to-number (match-string 2 value)))
-                   (fprop (wgrep-construct-filename-property fn)))
-              (put-text-property start end 'wgrep-line-filename fn)
-              (put-text-property start end 'wgrep-line-number line)
-              (put-text-property start (+ start namelen) fprop fn))))))
+        (let* ((value (get-text-property (point) 'helm-realvalue))
+               (data (helm-c-grep-split-line value))
+               (fn (nth 0 data))
+               (line (string-to-number (nth 1 data)))
+               (fprop (wgrep-construct-filename-property fn)))
+          (put-text-property start end 'wgrep-line-filename fn)
+          (put-text-property start end 'wgrep-line-number line)
+          (put-text-property start (+ start namelen) fprop fn))))
     (forward-line 1)))
 
 ;;;###autoload(add-hook 'helm-grep-mode-hook 'wgrep-helm-setup)

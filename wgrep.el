@@ -402,7 +402,7 @@ End of this match equals start of file contents.
 
 (defun wgrep-put-change-face (beg end)
   (save-excursion
-    ;; looking-at destroy match data while replace by regexp.
+    ;; `looking-at' may destroy match data while replace by regexp.
     (save-match-data
       (let ((ov (wgrep-editing-overlay beg end)))
         ;; delete overlay if text is same as old value.
@@ -837,12 +837,12 @@ This change will be applied when \\[wgrep-finish-edit]."
 (defun wgrep-goto-grep-line (file number)
   (let ((first (point))
         (fprop (wgrep-construct-filename-property file))
-        next)
+        fn next)
     (catch 'found
       ;; FIXME
       ;; In a huge buffer, `next-single-property-change' loop make
       ;; slow down the program.
-      ;; 1. sketchy move by filename.
+      ;; 1. sketchy move by filename (wgrep-fn-* property).
       ;; 2. search filename and line-number in text property.
       ;; 3. return to 1. while search is done or EOB.
 
@@ -850,11 +850,18 @@ This change will be applied when \\[wgrep-finish-edit]."
 
       (while (setq next (next-single-property-change (point) fprop))
         (goto-char next)
-        (let ((num (get-text-property (point) 'wgrep-line-number))
-              (start (next-single-property-change (point) 'wgrep-line-number)))
-          (when (eq number num)
-            (goto-char start)
-            (throw 'found t))))
+        (while (and (not (eobp))
+                    (or (null (setq fn (get-text-property
+                                        (line-beginning-position)
+                                        'wgrep-line-filename)))
+                        (string= fn file)))
+          (when fn
+            (let ((num (get-text-property (point) 'wgrep-line-number))
+                  (start (next-single-property-change (point) 'wgrep-line-number)))
+              (when (eq number num)
+                (goto-char start)
+                (throw 'found t))))
+          (forward-line 1)))
       (goto-char first)
       nil)))
 

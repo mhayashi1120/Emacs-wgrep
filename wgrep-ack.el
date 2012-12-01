@@ -3,10 +3,10 @@
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Contributor: Ivan Andrus <darthandrus@gmail.com>
 ;; Keywords: grep edit extensions
-;; Package-Requires: ((wgrep "2.1.0") (ack-and-a-half "1.1.0"))
+;; Package-Requires: ((wgrep "2.1.1"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-ack.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.1.0
+;; Version: 0.1.1
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -49,9 +49,6 @@
 
 (require 'wgrep)
 
-(defvar ack-and-a-half-mode-map)
-(defvar ack-mode-map)
-
 ;;;###autoload
 (defun wgrep-ack-and-a-half-setup ()
   ;; ack-and-a-half-mode prints a column number too, so we catch that
@@ -61,40 +58,35 @@
        (concat
         (caar grep-regexp-alist)
         "\\(?:\\([1-9][0-9]*\\)\\2\\)?"))
-  (define-key ack-and-a-half-mode-map
-    wgrep-enable-key 'wgrep-change-to-wgrep-mode)
-  (add-to-list 'wgrep-acceptable-modes 'ack-and-a-half-mode)
   (wgrep-setup-internal))
 
 ;;;###autoload
 (defun wgrep-ack-setup ()
   (set (make-local-variable 'wgrep-results-parser)
        'wgrep-ack-prepare-command-results)
-  (define-key ack-mode-map
-    wgrep-enable-key 'wgrep-change-to-wgrep-mode)
-  (add-to-list 'wgrep-acceptable-modes 'ack-mode)
   (wgrep-setup-internal))
 
 (defun wgrep-ack-prepare-command-results ()
-  (let (file)
+  (let (fprop fn)
     (while (not (eobp))
       (cond
-       ((null file)
+       ((null fn)
         ;; index of filename
         (let ((bol (line-beginning-position))
               (eol (line-end-position)))
           (when (/= bol eol)
-            (setq file
-                  (buffer-substring-no-properties bol eol))
+            (setq fn (buffer-substring-no-properties bol eol))
+            (setq fprop (wgrep-construct-filename-property fn))
+            (put-text-property bol eol fprop fn)
             (put-text-property bol eol 'wgrep-ignore t))))
        ((looking-at "^\\([0-9]+\\)[:-]")
         (let ((start (match-beginning 0))
               (end (match-end 0))
               (line (string-to-number (match-string 1))))
-          (put-text-property start end 'wgrep-line-filename file)
+          (put-text-property start end 'wgrep-line-filename fn)
           (put-text-property start end 'wgrep-line-number line)))
        ((looking-at "^$")
-        (setq file nil)))
+        (setq fn nil)))
       (forward-line 1))))
 
 ;;;###autoload(add-hook 'ack-and-a-half-mode-hook 'wgrep-ack-and-a-half-setup)

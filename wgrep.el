@@ -663,6 +663,7 @@ This change will be applied when \\[wgrep-finish-edit]."
             ;; end of context output `--'.
             (forward-line -1))))
        (t
+        ;; Add property but this may be removed by `wgrep-prepare-context-while'
         (put-text-property
          (line-beginning-position) (line-end-position)
          'wgrep-ignore t)))
@@ -707,10 +708,13 @@ This change will be applied when \\[wgrep-finish-edit]."
     (forward-line direction)
     (while (looking-at (format "^%s-%d-" fregexp next))
       (let ((start (match-beginning 0))
-            (end (match-end 0)))
+            (end (match-end 0))
+            (bol (line-beginning-position))
+            (eol (line-end-position)))
         (put-text-property start end 'wgrep-line-filename filename)
         (put-text-property start end 'wgrep-line-number next)
         (put-text-property start (+ start flen) fprop filename)
+        (remove-text-properties bol eol '(wgrep-ignore))
         (forward-line direction)
         (setq next (+ direction next))))))
 

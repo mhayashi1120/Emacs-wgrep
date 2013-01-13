@@ -750,11 +750,12 @@ This change will be applied when \\[wgrep-finish-edit]."
     (goto-char (point-max))
     (forward-line -1)
     (re-search-backward "^$" nil t)
-    (setq beg (point))
-    (setq end (point-max))
-    (when beg
-      (put-text-property beg end 'read-only t)
-      (put-text-property beg end 'wgrep-footer t))))
+    (unless (<= (point) end)
+      (setq beg (point))
+      (setq end (point-max))
+      (when beg
+        (put-text-property beg end 'read-only t)
+        (put-text-property beg end 'wgrep-footer t)))))
 
 (defun wgrep-set-header/footer-read-only (state)
   (let ((inhibit-read-only t)

@@ -749,7 +749,7 @@ This change will be applied when \\[wgrep-finish-edit]."
     ;; Set read-only grep result footer
     (goto-char (point-max))
     (forward-line -1)
-    (when (re-search-backward "^$" nil t)
+    (when (re-search-backward "^$" end t)
       (setq beg (point))
       (setq end (point-max))
       (when beg

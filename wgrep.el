@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 2.1.1
+;; Version: 2.1.2
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -749,8 +749,7 @@ This change will be applied when \\[wgrep-finish-edit]."
     ;; Set read-only grep result footer
     (goto-char (point-max))
     (forward-line -1)
-    (re-search-backward "^$" nil t)
-    (unless (<= (point) end)
+    (when (re-search-backward "^$" nil t)
       (setq beg (point))
       (setq end (point-max))
       (when beg

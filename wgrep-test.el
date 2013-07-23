@@ -16,7 +16,8 @@
 (defun wgrep-test--prepare (file contents &optional cs)
   ;; cleanup for convinience
   (let ((buf (get-file-buffer file)))
-    (kill-buffer buf))
+    (when (buffer-live-p buf)
+      (kill-buffer buf)))
   (let ((coding-system-for-write cs))
     (write-region contents nil file)))
 

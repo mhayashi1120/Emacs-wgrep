@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 2.1.4
+;; Version: 2.1.5
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -99,7 +99,8 @@
   :type 'boolean)
 
 (defcustom wgrep-enable-key "\C-c\C-p"
-  "Key to enable `wgrep-mode'."
+  "This variable will be obsoleted in the future release.
+Key to enable `wgrep-mode'."
   :group 'wgrep
   :type 'string)
 

@@ -147,3 +147,4 @@
 ;; * broken file contents (invalid coding system)
 ;; * new text contains newline
 ;; * wgrep-change-readonly-file
+;; * test wgrep-*.el

@@ -2,10 +2,10 @@
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Keywords: grep edit extensions
-;; Package-Requires: ((wgrep "2.1.1"))
+;; Package-Requires: ((wgrep "2.1.5"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-ag.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.1.0
+;; Version: 0.1.1
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -31,7 +31,7 @@
 
 ;; 1. Install ag.el
 ;;
-;;   TODO https://github.com/jhelwig/ack-and-a-half
+;;   https://github.com/Wilfred/ag.el
 
 ;; 2. Install wgrep.el
 
@@ -63,7 +63,7 @@
 (add-hook 'ag-mode-hook 'wgrep-ag-setup)
 
 ;; For `unload-feature'
-(defun wgrep-ack-unload-function ()
+(defun wgrep-ag-unload-function ()
   (remove-hook 'ag-mode-hook 'wgrep-ag-setup))
 
 (provide 'wgrep-ag)

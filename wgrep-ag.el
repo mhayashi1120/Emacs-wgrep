@@ -5,7 +5,7 @@
 ;; Package-Requires: ((wgrep "2.1.5"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-ag.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.1.1
+;; Version: 0.1.2
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -38,7 +38,8 @@
 ;; 3. Put this file into load-path'ed directory, and byte compile it if
 ;; desired. And put the following expression into your ~/.emacs.
 ;;
-;;     (require 'wgrep-ag)
+;;     (autoload 'wgrep-ag-setup "wgrep-ag")
+;;     (add-hook 'ag-mode-hook 'wgrep-ag-setup)
 
 ;;; Usage:
 
@@ -59,7 +60,7 @@
         "\\(?:\\([1-9][0-9]*\\)\\2\\)?"))
   (wgrep-setup-internal))
 
-;;;###autoload(add-hook 'ag-mode-hook 'wgrep-ag-setup)
+;;;###autoload
 (add-hook 'ag-mode-hook 'wgrep-ag-setup)
 
 ;; For `unload-feature'

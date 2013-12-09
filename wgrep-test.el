@@ -20,6 +20,12 @@
   (let ((coding-system-for-write cs))
     (write-region contents nil file)))
 
+(defun wgrep-test--cleanup-file (file)
+  (when (file-exists-p file)
+    (delete-file file))
+  (when (file-exists-p (concat file "~"))
+    (delete-file (concat file "~"))))
+
 (ert-deftest wgrep-normal ()
   :tags '(wgrep)
   (let (wgrep-auto-save-buffer)
@@ -46,7 +52,7 @@
     (wgrep-save-all-buffers)
     ;; compare file contents is valid
     (should (equal "FOO2\nBAZ\n" (wgrep-test--contents "test-data.txt")))
-    (delete-file "test-data.txt")))
+    (wgrep-test--cleanup-file "test-data.txt")))
 
 (ert-deftest wgrep-normal-with-newline ()
   :tags '(wgrep)
@@ -66,7 +72,7 @@
     (wgrep-save-all-buffers)
     ;; compare file contents is valid
     (should (equal "FOO\nBAZ\n" (wgrep-test--contents "test-data.txt")))
-    (delete-file "test-data.txt")))
+    (wgrep-test--cleanup-file "test-data.txt")))
 
 (ert-deftest wgrep-bom-with-multibyte ()
   :tags '(wgrep)
@@ -88,7 +94,7 @@
     (wgrep-save-all-buffers)
     ;; compare file contents is valid
     (should (equal "へのへのも\nへじ\nう\n" (wgrep-test--contents "test-data.txt")))
-    (delete-file "test-data.txt")))
+    (wgrep-test--cleanup-file "test-data.txt")))
 
 (ert-deftest wgrep-bom-with-unibyte ()
   :tags '(wgrep)
@@ -106,7 +112,7 @@
     (wgrep-save-all-buffers)
     ;; compare file contents is valid
     (should (equal "ABCD\nb\n" (wgrep-test--contents "test-data.txt")))
-    (delete-file "test-data.txt")))
+    (wgrep-test--cleanup-file "test-data.txt")))
 
 (ert-deftest wgrep-with-modify ()
   :tags '(wgrep)
@@ -137,13 +143,27 @@
     (wgrep-save-all-buffers)
     ;; compare file contents is valid
     (should (equal "hoge\nfoo\nC\n" (wgrep-test--contents "test-data.txt")))
-    (delete-file "test-data.txt")))
+    (wgrep-test--cleanup-file "test-data.txt")))
 
-;; TODO 
+(ert-deftest wgrep-with-readonly-file ()
+  :tags '(wgrep)
+  (let (wgrep-auto-save-buffer)
+    (wgrep-test--prepare "test-data.txt" "a\nb\nc\n")
+    ;; make readonly
+    (set-file-modes "test-data.txt" ?\400)
+    (wgrep-test--grep "grep -nH -e 'a' test-data.txt")
+    (wgrep-change-to-wgrep-mode)
+    (goto-char (point-min))
+    (should (re-search-forward "test-data\\.txt:[0-9]+:.*\\(a\\)$" nil t))
+    (replace-match "A" nil nil nil 1)
+    ;; only check with no error
+    (wgrep-finish-edit))
+  (wgrep-test--cleanup-file "test-data.txt"))
+
+;; TODO (Not implemented testcase)
 ;; * wgrep-toggle-readonly-area
 ;; ** sort-lines
 ;; * wgrep-abort-changes
 ;; * wgrep-exit
 ;; * broken file contents (invalid coding system)
 ;; * new text contains newline
-;; * wgrep-change-readonly-file

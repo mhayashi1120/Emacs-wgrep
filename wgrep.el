@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 2.1.3
+;; Version: 2.1.4
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -888,7 +888,12 @@ This change will be applied when \\[wgrep-finish-edit]."
                (start (next-single-property-change
                        (point) 'wgrep-line-filename nil (line-end-position)))
                (file (expand-file-name name default-directory))
-               (buffer (wgrep-get-file-buffer file))
+               (file-error nil)
+               (buffer (condition-case err
+                           (wgrep-get-file-buffer file)
+                         (wgrep-error
+                          (setq file-error (cdr err))
+                          nil)))
                (old (overlay-get ov 'wgrep-old-text))
                (new (overlay-get ov 'wgrep-edit-text))
                result)
@@ -902,10 +907,12 @@ This change will be applied when \\[wgrep-finish-edit]."
             ;; create overlay to show result of committing
             (setq result (wgrep-make-overlay start (overlay-end ov)))
             (overlay-put result 'wgrep-result t))
-          (setq res
-                (cons
-                 (list buffer linum old new result ov)
-                 res))))))
+          (if file-error
+              (wgrep-put-reject-result result file-error)
+            (setq res
+                  (cons
+                   (list buffer linum old new result ov)
+                   res)))))))
     (nreverse res)))
 
 (defun wgrep-compute-transaction ()

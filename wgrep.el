@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 2.1.4
+;; Version: 2.1.6
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -99,7 +99,8 @@
   :type 'boolean)
 
 (defcustom wgrep-enable-key "\C-c\C-p"
-  "Key to enable `wgrep-mode'."
+  "This variable will be obsoleted in the future release.
+Key to enable `wgrep-mode'."
   :group 'wgrep
   :type 'string)
 
@@ -272,10 +273,11 @@ End of this match equals start of file contents.
           (put-text-property (1- start) start 'read-only state))
         (setq pos end))
       ;; set readonly last of grep line
-      (let ((footer (next-single-property-change (point-min) 'wgrep-footer)))
-        (when footer
-          (when (eq (char-before footer) ?\n)
-            (put-text-property (1- footer) footer 'read-only state)))))
+      (let ((footer (or (next-single-property-change (point-min) 'wgrep-footer)
+                        ;; to consider empty footer.
+                        (point-max))))
+        (when (eq (char-before footer) ?\n)
+          (put-text-property (1- footer) footer 'read-only state))))
     (setq wgrep-readonly-state state)))
 
 (defun wgrep-after-change-function (beg end leng-before)

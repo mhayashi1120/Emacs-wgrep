@@ -990,16 +990,23 @@ NEW may be nil this means deleting whole line."
       (when new
         (setq new (wgrep-string-replace-bom new coding))))
     ;; Check buffer line was modified after execute grep.
-    (unless (string= old
-                     (buffer-substring-no-properties
-                      (line-beginning-position) (line-end-position)))
-      (signal 'wgrep-error (list "Buffer was changed after grep.")))
-    (cond
-     (new
-      (wgrep-replace-to-new-line new))
-     (t
-      ;; new nil means flush whole line.
-      (wgrep-flush-whole-line)))))
+    (let ((line (buffer-substring-no-properties
+                 (line-beginning-position) (line-end-position))))
+      (cond
+       ((string= old line))
+       ;; todo may be
+       ((equal new line))
+       (t
+        (signal 'wgrep-error (list "Buffer was changed after grep."))))
+      (cond
+       ((null new)
+        ;; new nil means flush whole line.
+        (wgrep-flush-whole-line))
+       ((equal new line)
+        ;; TODO do nothing
+        )
+       (t
+        (wgrep-replace-to-new-line new))))))
 
 ;;;
 ;;; activate/deactivate marmalade install or github install.

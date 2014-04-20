@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 2.1.6
+;; Version: 2.1.7
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -990,23 +990,16 @@ NEW may be nil this means deleting whole line."
       (when new
         (setq new (wgrep-string-replace-bom new coding))))
     ;; Check buffer line was modified after execute grep.
-    (let ((line (buffer-substring-no-properties
-                 (line-beginning-position) (line-end-position))))
-      (cond
-       ((string= old line))
-       ;; todo may be
-       ((equal new line))
-       (t
-        (signal 'wgrep-error (list "Buffer was changed after grep."))))
-      (cond
-       ((null new)
-        ;; new nil means flush whole line.
-        (wgrep-flush-whole-line))
-       ((equal new line)
-        ;; TODO do nothing
-        )
-       (t
-        (wgrep-replace-to-new-line new))))))
+    (unless (string= old
+                     (buffer-substring-no-properties
+                      (line-beginning-position) (line-end-position)))
+      (signal 'wgrep-error (list "Buffer was changed after grep.")))
+    (cond
+     (new
+      (wgrep-replace-to-new-line new))
+     (t
+      ;; new nil means flush whole line.
+      (wgrep-flush-whole-line)))))
 
 ;;;
 ;;; activate/deactivate marmalade install or github install.

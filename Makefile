@@ -2,7 +2,7 @@ EMACS = emacs
 
 check: compile
 	$(EMACS) -q -batch \
-		-L . -l wgrep.el -l wgrep-ag.el -l wgrep-helm.el -l wgrep-ack.el wgrep-pt.el \
+		-L . -l wgrep.el -l wgrep-ag.el -l wgrep-helm.el -l wgrep-ack.el -l wgrep-pt.el \
 		-l wgrep-test.el \
 		-f ert-run-tests-batch-and-exit
 	$(EMACS) -q -batch \

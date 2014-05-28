@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 2.1.7
+;; Version: 2.1.8
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -1005,7 +1005,7 @@ NEW may be nil this means deleting whole line."
 ;;; activate/deactivate marmalade install or github install.
 ;;;
 
-;;;###autoload(add-hook 'grep-setup-hook 'wgrep-setup)
+;;;###autoload
 (add-hook 'grep-setup-hook 'wgrep-setup)
 
 ;; For `unload-feature'

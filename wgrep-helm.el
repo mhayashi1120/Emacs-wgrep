@@ -5,7 +5,7 @@
 ;; Package-Requires: ((wgrep "2.1.1"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-helm.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.1.3
+;; Version: 0.1.4
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -80,10 +80,10 @@
           (put-text-property start (+ start namelen) fprop fn))))
     (forward-line 1)))
 
-;;;###autoload(add-hook 'helm-grep-mode-hook 'wgrep-helm-setup)
+;;;###autoload
 (add-hook 'helm-grep-mode-hook 'wgrep-helm-setup)
 
-;;;###autoload(add-hook 'helm-moccur-mode-hook 'wgrep-helm-setup)
+;;;###autoload
 (add-hook 'helm-moccur-mode-hook 'wgrep-helm-setup)
 
 ;; For `unload-feature'

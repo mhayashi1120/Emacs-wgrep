@@ -6,7 +6,7 @@
 ;; Package-Requires: ((wgrep "2.1.1"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-ack.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.1.1
+;; Version: 0.1.2
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -89,10 +89,10 @@
         (setq fn nil)))
       (forward-line 1))))
 
-;;;###autoload(add-hook 'ack-and-a-half-mode-hook 'wgrep-ack-and-a-half-setup)
+;;;###autoload
 (add-hook 'ack-and-a-half-mode-hook 'wgrep-ack-and-a-half-setup)
 
-;;;###autoload(add-hook 'ack-mode-hook 'wgrep-ack-setup)
+;;;###autoload
 (add-hook 'ack-mode-hook 'wgrep-ack-setup)
 
 ;; For `unload-feature'

@@ -83,6 +83,9 @@
 ;;;###autoload(add-hook 'helm-grep-mode-hook 'wgrep-helm-setup)
 (add-hook 'helm-grep-mode-hook 'wgrep-helm-setup)
 
+;;;###autoload(add-hook 'helm-moccur-mode-hook 'wgrep-helm-setup)
+(add-hook 'helm-moccur-mode-hook 'wgrep-helm-setup)
+
 ;; For `unload-feature'
 (defun wgrep-helm-unload-function ()
   (remove-hook 'helm-grep-mode-hook 'wgrep-helm-setup))

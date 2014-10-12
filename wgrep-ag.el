@@ -5,7 +5,7 @@
 ;; Package-Requires: ((wgrep "2.1.5"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-ag.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.1.2
+;; Version: 0.1.3
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -56,7 +56,7 @@
   ;; might need to change if (caar grep-regexp-alist) does.
   (set (make-local-variable 'wgrep-line-file-regexp)
        (concat
-        (caar grep-regexp-alist)
+        wgrep-default-line-header-regexp
         "\\(?:\\([1-9][0-9]*\\)\\2\\)?"))
   (wgrep-setup-internal))
 

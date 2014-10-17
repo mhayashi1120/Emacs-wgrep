@@ -1,19 +1,26 @@
 (require 'ert)
 
-(defun wgrep-test--grep (command)
-  (let* ((buf (grep command))
-         (proc (get-buffer-process buf)))
+(defun wgrep-test--wait (buf)
+  (let ((proc (get-buffer-process buf)))
     (while (eq (process-status proc) 'run) 
       (sit-for 0.1))
     (switch-to-buffer buf)))
 
-(defun wgrep-test--contents (file &optional cs)
+(defun wgrep-test--grep (command)
+  (let ((buf (grep command)))
+    (wgrep-test--wait buf)))
+
+(defun wgrep-test--ag (string)
+  (let ((buf (ag/search string default-directory)))
+    (wgrep-test--wait buf)))
+
+(defun wgrep-test--get-contents (file &optional cs)
   (let ((coding-system-for-read cs))
     (with-temp-buffer
       (insert-file-contents file)
       (buffer-string))))
 
-(defun wgrep-test--prepare (file contents &optional cs)
+(defun wgrep-test--prepare-file (file contents &optional cs)
   ;; cleanup for convinience
   (let ((buf (get-file-buffer file)))
     (when (buffer-live-p buf)
@@ -30,7 +37,7 @@
 (ert-deftest wgrep-normal ()
   :tags '(wgrep)
   (let (wgrep-auto-save-buffer)
-    (wgrep-test--prepare "test-data.txt" "HOGE\nFOO\nBAZ\n")
+    (wgrep-test--prepare-file "test-data.txt" "HOGE\nFOO\nBAZ\n")
     (wgrep-test--grep "grep -nH -e FOO -C 1 test-data.txt")
     (wgrep-change-to-wgrep-mode)
     (goto-char (point-min))
@@ -52,13 +59,13 @@
     ;; save to file
     (wgrep-save-all-buffers)
     ;; compare file contents is valid
-    (should (equal "FOO2\nBAZ\n" (wgrep-test--contents "test-data.txt")))
+    (should (equal "FOO2\nBAZ\n" (wgrep-test--get-contents "test-data.txt")))
     (wgrep-test--cleanup-file "test-data.txt")))
 
 (ert-deftest wgrep-normal-with-newline ()
   :tags '(wgrep)
   (let (wgrep-auto-save-buffer)
-    (wgrep-test--prepare "test-data.txt" "HOGE\n")
+    (wgrep-test--prepare-file "test-data.txt" "HOGE\n")
     (wgrep-test--grep "grep -nH -e HOGE test-data.txt")
     (wgrep-change-to-wgrep-mode)
     (goto-char (point-min))
@@ -72,13 +79,13 @@
     ;; save to file
     (wgrep-save-all-buffers)
     ;; compare file contents is valid
-    (should (equal "FOO\nBAZ\n" (wgrep-test--contents "test-data.txt")))
+    (should (equal "FOO\nBAZ\n" (wgrep-test--get-contents "test-data.txt")))
     (wgrep-test--cleanup-file "test-data.txt")))
 
 (ert-deftest wgrep-bom-with-multibyte ()
   :tags '(wgrep)
   (let (wgrep-auto-save-buffer)
-    (wgrep-test--prepare "test-data.txt" "あ\nい\nう\n" 'utf-8-with-signature)
+    (wgrep-test--prepare-file "test-data.txt" "あ\nい\nう\n" 'utf-8-with-signature)
     (wgrep-test--grep "grep -nH -e 'あ' -A 2 test-data.txt")
     (wgrep-change-to-wgrep-mode)
     (goto-char (point-min))
@@ -94,13 +101,13 @@
     ;; save to file
     (wgrep-save-all-buffers)
     ;; compare file contents is valid
-    (should (equal "へのへのも\nへじ\nう\n" (wgrep-test--contents "test-data.txt")))
+    (should (equal "へのへのも\nへじ\nう\n" (wgrep-test--get-contents "test-data.txt")))
     (wgrep-test--cleanup-file "test-data.txt")))
 
 (ert-deftest wgrep-bom-with-unibyte ()
   :tags '(wgrep)
   (let (wgrep-auto-save-buffer)
-    (wgrep-test--prepare "test-data.txt" "a\nb\n" 'utf-8-with-signature)
+    (wgrep-test--prepare-file "test-data.txt" "a\nb\n" 'utf-8-with-signature)
     (wgrep-test--grep "grep -nH -e 'a' -A 2 test-data.txt")
     (wgrep-change-to-wgrep-mode)
     (goto-char (point-min))
@@ -112,13 +119,13 @@
     ;; save to file
     (wgrep-save-all-buffers)
     ;; compare file contents is valid
-    (should (equal "ABCD\nb\n" (wgrep-test--contents "test-data.txt")))
+    (should (equal "ABCD\nb\n" (wgrep-test--get-contents "test-data.txt")))
     (wgrep-test--cleanup-file "test-data.txt")))
 
 (ert-deftest wgrep-with-modify ()
   :tags '(wgrep)
   (let (wgrep-auto-save-buffer)
-    (wgrep-test--prepare "test-data.txt" "a\nb\nc\n")
+    (wgrep-test--prepare-file "test-data.txt" "a\nb\nc\n")
     (with-current-buffer (find-file-noselect "test-data.txt")
       ;; modify file buffer
       (goto-char (point-min))
@@ -143,13 +150,13 @@
     ;; save to file
     (wgrep-save-all-buffers)
     ;; compare file contents is valid
-    (should (equal "hoge\nfoo\nC\n" (wgrep-test--contents "test-data.txt")))
+    (should (equal "hoge\nfoo\nC\n" (wgrep-test--get-contents "test-data.txt")))
     (wgrep-test--cleanup-file "test-data.txt")))
 
 (ert-deftest wgrep-with-readonly-file ()
   :tags '(wgrep)
   (let (wgrep-auto-save-buffer)
-    (wgrep-test--prepare "test-data.txt" "a\nb\nc\n")
+    (wgrep-test--prepare-file "test-data.txt" "a\nb\nc\n")
     ;; make readonly
     (set-file-modes "test-data.txt" ?\400)
     (wgrep-test--grep "grep -nH -e 'a' test-data.txt")

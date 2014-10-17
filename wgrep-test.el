@@ -4,14 +4,15 @@
   (let ((proc (get-buffer-process buf)))
     (while (eq (process-status proc) 'run) 
       (sit-for 0.1))
+    (sleep-for 0.2)
     (switch-to-buffer buf)))
 
 (defun wgrep-test--grep (command)
   (let ((buf (grep command)))
     (wgrep-test--wait buf)))
 
-(defun wgrep-test--ag (string)
-  (let ((buf (ag/search string default-directory)))
+(defun wgrep-test--ag (string file)
+  (let ((buf (ag/search string default-directory :file-regex file :regexp t)))
     (wgrep-test--wait buf)))
 
 (defun wgrep-test--get-contents (file &optional cs)

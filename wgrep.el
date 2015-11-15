@@ -109,6 +109,11 @@ Key to enable `wgrep-mode'."
   :group 'wgrep
   :type 'boolean)
 
+(defcustom wgrep-begin-edit-buffer-hook nil
+  "Hook execute before applying changes in the editing buffer."
+  :group 'wgrep
+  :type 'hook)
+
 (defvar wgrep-setup-hook nil
   "Hooks to run when setting up wgrep.")
 
@@ -960,6 +965,7 @@ This change will be applied when \\[wgrep-finish-edit]."
     (save-restriction
       (widen)
       (wgrep-display-physical-data)
+      (run-hooks 'wgrep-begin-edit-buffer-hook)
       (let ((inhibit-read-only wgrep-change-readonly-file)
             done)
         (dolist (info tran)

@@ -960,35 +960,41 @@ This change will be applied when \\[wgrep-finish-edit]."
     all-tran))
 
 (defun wgrep-commit-buffer (buffer tran)
-  ;; Apply TRAN to BUFFER.
-  ;; See `wgrep-compute-transaction'
-  (with-current-buffer buffer
-    (save-restriction
-      (widen)
-      (wgrep-display-physical-data)
-      (run-hooks 'wgrep-begin-edit-buffer-hook)
-      (let ((inhibit-read-only wgrep-change-readonly-file)
-            done)
-        (dolist (info tran)
-          (let ((marker (nth 0 info))
-                (old (nth 1 info))
-                (new (nth 2 info))
-                (result (nth 3 info))
-                (ov (nth 4 info)))
-            (condition-case err
-                (progn
-                  ;; check the buffer while each of overlays
-                  ;; to set a result message.
-                  (wgrep-check-buffer)
-                  (wgrep-apply-change marker old new)
-                  (wgrep-put-done-result result)
-                  (delete-overlay ov)
-                  (setq done (cons ov done)))
-              (error
-               (wgrep-put-reject-result result (cdr err))))))
-        (when (and wgrep-auto-save-buffer done)
-          (basic-save-buffer))
-        (nreverse done)))))
+  (catch 'done
+    ;; Apply TRAN to BUFFER.
+    ;; See `wgrep-compute-transaction'
+    (with-current-buffer buffer
+      (save-restriction
+        (widen)
+        (condition-case err
+            (progn
+              (wgrep-display-physical-data)
+              (run-hooks 'wgrep-begin-edit-buffer-hook)
+              (wgrep-check-buffer))
+          (error
+           ;; put error messages on all lines should be changed
+           (dolist (info tran)
+             (wgrep-put-reject-result (nth 3 info) (cdr err)))
+           (throw 'done nil)))
+        (let ((inhibit-read-only wgrep-change-readonly-file)
+              done)
+          (dolist (info tran)
+            (let ((marker (nth 0 info))
+                  (old (nth 1 info))
+                  (new (nth 2 info))
+                  (result (nth 3 info))
+                  (ov (nth 4 info)))
+              (condition-case err
+                  (progn
+                    (wgrep-apply-change marker old new)
+                    (wgrep-put-done-result result)
+                    (delete-overlay ov)
+                    (setq done (cons ov done)))
+                (error
+                 (wgrep-put-reject-result result (cdr err))))))
+          (when (and wgrep-auto-save-buffer done)
+            (basic-save-buffer))
+          (nreverse done))))))
 
 (defun wgrep-apply-change (marker old new)
   "The changes in the *grep* buffer are applied to the file.

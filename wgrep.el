@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 2.1.10
+;; Version: 2.2.1
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -306,13 +306,14 @@ End of this match equals start of file contents.
 (defun wgrep-get-file-buffer (file)
   (unless (file-exists-p file)
     (signal 'wgrep-error (list "File does not exist.")))
-  (unless (file-writable-p file)
-    (signal 'wgrep-error (list "File is not writable.")))
   (or (get-file-buffer file)
       (find-file-noselect file)))
 
 (defun wgrep-check-buffer ()
-  "Check the file's status. If it is possible to change the file, return t"
+  "Check the file's status just before edit the buffer.
+If it is impossible to change the file, raise a error."
+  (unless (file-writable-p buffer-file-name)
+    (signal 'wgrep-error (list "File is not writable.")))
   (when (and (not wgrep-change-readonly-file)
              buffer-read-only)
     (signal 'wgrep-error

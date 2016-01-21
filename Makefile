@@ -23,6 +23,7 @@ download-external: clean-ext
 	cd ext && wget "https://github.com/magnars/s.el/raw/master/s.el"
 
 compile:
+	$(EMACS) --version
 	$(EMACS) -q -batch -L . -f batch-byte-compile \
 		wgrep.el wgrep-ag.el wgrep-helm.el wgrep-ack.el wgrep-pt.el
 

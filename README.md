@@ -1,3 +1,6 @@
+[![MELPA](http://melpa.org/packages/wgrep-badge.svg)](http://melpa.org/#/wgrep)
+[![MELPA Stable](https://stable.melpa.org/packages/wgrep-badge.svg)](https://stable.melpa.org/#/wgrep)
+
 # wgrep.el
 
 wgrep allows you to edit a grep buffer and apply those changes to

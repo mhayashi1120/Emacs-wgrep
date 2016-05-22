@@ -3,10 +3,10 @@
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Contributor: Ivan Andrus <darthandrus@gmail.com>
 ;; Keywords: grep edit extensions
-;; Package-Requires: ((wgrep "2.1.1"))
+;; Package-Requires: ((wgrep "2.1.10"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-ack.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.1.3
+;; Version: 2.1.10
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as

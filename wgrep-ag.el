@@ -48,16 +48,75 @@
 ;;; Code:
 
 (require 'wgrep)
+(require 'cl-lib)
+
+(defun wgrep-ag-prepare-header/footer ()
+  (save-excursion
+    (goto-char (point-min))
+    (when (not (get-text-property (point) 'compilation-message))
+      (let ((first-result (next-single-property-change (point)
+                                                       'compilation-message)))
+        ;; Maybe ag was run with --group?  Pedantry demands that I not
+        ;; mark the first "File:" line as part of the wgrep-header.
+        (when first-result
+          (goto-char first-result)
+          (when (and (zerop (forward-line -1))
+                     (looking-at-p "^File: "))
+             (setq first-result (point))))
+        (add-text-properties (point-min) (or first-result (point-max))
+                             '(read-only t wgrep-header t))))
+    (goto-char (point-max))
+    (forward-line 0)
+    (when (not (or (get-text-property (point) 'compilation-message)
+                   (get-text-property (point) 'wgrep-header)))
+      (goto-char (previous-single-property-change (point) 'compilation-message))
+      (forward-line 1)
+      (add-text-properties (point) (point-max)
+                           '(read-only t wgrep-footer t)))))
+
+(defun wgrep-ag-parse-command-results ()
+  (save-excursion
+    (goto-char (point-min))
+    (cl-loop
+       with last-file-name
+       for ref-start = (point) then (next-single-property-change
+                                     (point)
+                                     'compilation-message)
+       while ref-start
+       do
+         (goto-char ref-start)
+         (let ((compile-msg (get-text-property (point)
+                                               'compilation-message)))
+           ;; This should always be true, but just in case:
+           (when compile-msg
+             (let ((ref-end (next-single-property-change (point)
+                                                         'compilation-message)))
+               (goto-char ref-end)
+               ;; We expect to be able to find the end of this
+               ;; compilation message before running into another one.
+               (unless (get-text-property (point) 'compilation-message)
+                 (let* ((loc (compilation--message->loc compile-msg))
+                        (line-num (compilation--loc->line loc))
+                        (file-name (car (compilation--file-struct->file-spec
+                                         (compilation--loc->file-struct loc)))))
+                   (unless (string= file-name last-file-name)
+                     (put-text-property ref-start ref-end
+                                        (wgrep-construct-filename-property
+                                         file-name)
+                                        file-name)
+                     (setq last-file-name file-name))
+                   (add-text-properties ref-start ref-end
+                                        (list 'wgrep-line-filename
+                                              file-name
+                                              'wgrep-line-number
+                                              line-num))))))))))
 
 ;;;###autoload
 (defun wgrep-ag-setup ()
-  ;; ag.el prints a column number too, so we catch that
-  ;; if it exists.  Here \2 is a colon + whitespace separator.  This
-  ;; might need to change if (caar grep-regexp-alist) does.
-  (set (make-local-variable 'wgrep-line-file-regexp)
-       (concat
-        wgrep-default-line-header-regexp
-        "\\(?:\\([1-9][0-9]*\\)\\2\\)?"))
+  (set (make-local-variable 'wgrep-header/footer-parser)
+       'wgrep-ag-prepare-header/footer)
+  (set (make-local-variable 'wgrep-results-parser)
+       'wgrep-ag-parse-command-results)
   (wgrep-setup-internal))
 
 ;;;###autoload

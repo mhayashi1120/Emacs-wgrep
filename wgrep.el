@@ -356,6 +356,13 @@ End of this match equals start of file contents.
       ;; make overlay volatile.
       (wgrep-let-destructive-overlay ov))))
 
+(defun wgrep-replace-substring (old new)
+  (when (search-forward old (line-end-position) t)
+    (replace-match new)
+    (wgrep-let-destructive-overlay
+     (wgrep-put-overlay-to-file-buffer (match-beginning 0)
+                                       (match-end 0)))))
+
 (defun wgrep-flush-whole-line ()
   (wgrep-put-overlay-to-file-buffer
    (line-beginning-position) (line-end-position))
@@ -996,13 +1003,13 @@ NEW may be nil this means deleting whole line."
       (when new
         (setq new (wgrep-string-replace-bom new coding))))
     ;; Check buffer line was modified after execute grep.
-    (unless (string= old
-                     (buffer-substring-no-properties
-                      (line-beginning-position) (line-end-position)))
+    (unless (string-match (regexp-quote old)
+                          (buffer-substring-no-properties
+                           (line-beginning-position) (line-end-position)))
       (signal 'wgrep-error (list "Buffer was changed after grep.")))
     (cond
      (new
-      (wgrep-replace-to-new-line new))
+      (wgrep-replace-substring old new))
      (t
       ;; new nil means flush whole line.
       (wgrep-flush-whole-line)))))

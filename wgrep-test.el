@@ -63,6 +63,39 @@
     (should (equal "FOO2\nBAZ\n" (wgrep-test--get-contents "test-data.txt")))
     (wgrep-test--cleanup-file "test-data.txt")))
 
+(ert-deftest wgrep-substring ()
+  :tags '(wgrep)
+  (let (wgrep-auto-save-buffer)
+    (wgrep-test--prepare "test-data.txt" "HOGE\nFOO\nBAZ\n")
+    (wgrep-test--grep "grep -nH -e FOO -C 1 test-data.txt")
+    ;; make substring
+    (let ((buffer-read-only nil))
+      (goto-char (point-min))
+      (should (search-forward "FOO" nil t))
+      (replace-match "FO"))
+    (wgrep-change-to-wgrep-mode)
+    (goto-char (point-min))
+    ;; header is readonly
+    (should (re-search-forward "^grep" nil t))
+    (should-error (delete-char 1) :type 'text-read-only)
+    ;; search hit line (hit by -C option)
+    (should (re-search-forward "HOGE" nil t))
+    ;; delete 1st line
+    (wgrep-mark-deletion)
+    (should (re-search-forward "FO" nil t))
+    ;; replace 2nd line
+    (replace-match "FO2")
+    ;; footer is readonly
+    (goto-char (point-max))
+    (should-error (delete-char -1) :type 'text-read-only)
+    ;; apply to buffer
+    (wgrep-finish-edit)
+    ;; save to file
+    (wgrep-save-all-buffers)
+    ;; compare file contents is valid
+    (should (equal "FO2O\nBAZ\n" (wgrep-test--contents "test-data.txt")))
+    (wgrep-test--cleanup-file "test-data.txt")))
+
 (ert-deftest wgrep-normal-with-newline ()
   :tags '(wgrep)
   (let (wgrep-auto-save-buffer)

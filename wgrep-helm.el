@@ -5,7 +5,7 @@
 ;; Package-Requires: ((wgrep "2.1.1"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-helm.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.1.4
+;; Version: 0.1.5
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as

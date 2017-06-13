@@ -299,12 +299,17 @@ End of this match equals start of file contents.
 (put 'wgrep-error 'error-message "wgrep error")
 
 (defun wgrep-get-file-buffer (file)
-  (unless (file-exists-p file)
-    (signal 'wgrep-error (list "File does not exist.")))
-  (unless (file-writable-p file)
-    (signal 'wgrep-error (list "File is not writable.")))
-  (or (get-file-buffer file)
-      (find-file-noselect file)))
+  (let* ((buf      (get-buffer file))
+         (isbuffer (buffer-live-p buf)))
+    (unless (or (file-exists-p file) isbuffer)
+      (signal 'wgrep-error (list "File or buffer does not exist.")))
+    (unless (or (file-writable-p file)
+                (and isbuffer
+                     (with-current-buffer buf (null buffer-read-only))))
+      (signal 'wgrep-error (list "File or buffer is not writable.")))
+    (or buf
+        (get-file-buffer file)
+        (find-file-noselect file))))
 
 (defun wgrep-check-buffer ()
   "Check the file's status. If it is possible to change the file, return t"
@@ -895,7 +900,10 @@ This change will be applied when \\[wgrep-finish-edit]."
                (linum (get-text-property (point) 'wgrep-line-number))
                (start (next-single-property-change
                        (point) 'wgrep-line-filename nil (line-end-position)))
-               (file (expand-file-name name default-directory))
+               ;; Pass a file or a buffer to `wgrep-get-file-buffer'.
+               (file (pcase (expand-file-name name default-directory)
+                       ((and f (pred file-exists-p)) f)
+                       (_ name)))
                (file-error nil)
                (buffer (condition-case err
                            (wgrep-get-file-buffer file)

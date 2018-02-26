@@ -884,43 +884,49 @@ This change will be applied when \\[wgrep-finish-edit]."
 ;; value ::= linum old-text new-text result-overlay edit-overlay
 (defun wgrep-transaction-editing-list ()
   (let (res)
-    (dolist (ov (wgrep-edit-overlays))
-      (goto-char (overlay-start ov))
-      (forward-line 0)
-      (cond
-       ;; ignore removed line or removed overlay
-       ((eq (overlay-start ov) (overlay-end ov)))
-       ((get-text-property (point) 'wgrep-line-filename)
-        (let* ((name (get-text-property (point) 'wgrep-line-filename))
-               (linum (get-text-property (point) 'wgrep-line-number))
-               (start (next-single-property-change
-                       (point) 'wgrep-line-filename nil (line-end-position)))
-               (file (expand-file-name name default-directory))
-               (file-error nil)
-               (buffer (condition-case err
-                           (wgrep-get-file-buffer file)
-                         (wgrep-error
-                          (setq file-error (cdr err))
-                          nil)))
-               (old (overlay-get ov 'wgrep-old-text))
-               (new (overlay-get ov 'wgrep-edit-text))
-               result)
-          ;; wgrep-result overlay show the commiting of this editing
-          (catch 'done
-            (dolist (o (overlays-in (overlay-start ov) (overlay-end ov)))
-              (when (overlay-get o 'wgrep-result)
-                ;; get existing overlay
-                (setq result o)
-                (throw 'done t)))
-            ;; create overlay to show result of committing
-            (setq result (wgrep-make-overlay start (overlay-end ov)))
-            (overlay-put result 'wgrep-result t))
-          (if file-error
-              (wgrep-put-reject-result result file-error)
-            (setq res
-                  (cons
-                   (list buffer linum old new result ov)
-                   res)))))))
+    (let ((file "") (old-buffer nil))
+      (dolist (ov (wgrep-edit-overlays))
+        (goto-char (overlay-start ov))
+        (forward-line 0)
+        (cond
+         ;; ignore removed line or removed overlay
+         ((eq (overlay-start ov) (overlay-end ov)))
+         ((get-text-property (point) 'wgrep-line-filename)
+          (let* ((name (get-text-property (point) 'wgrep-line-filename))
+                 (linum (get-text-property (point) 'wgrep-line-number))
+                 (start (next-single-property-change
+                         (point) 'wgrep-line-filename nil (line-end-position)))
+                 (new-file (expand-file-name name default-directory))
+                 (file-error nil)
+                 (buffer (if (equal file new-file)
+                             old-buffer
+                           (condition-case err
+                             (wgrep-get-file-buffer new-file)
+                             (wgrep-error
+                              (setq file-error (cdr err))
+                              nil))))
+                 (old (overlay-get ov 'wgrep-old-text))
+                 (new (overlay-get ov 'wgrep-edit-text))
+                 result)
+            (message "Working on `%s'" file)
+            (setq file new-file
+                  old-buffer buffer)            
+            ;; wgrep-result overlay show the commiting of this editing
+            (catch 'done
+              (dolist (o (overlays-in (overlay-start ov) (overlay-end ov)))
+                (when (overlay-get o 'wgrep-result)
+                  ;; get existing overlay
+                  (setq result o)
+                  (throw 'done t)))
+              ;; create overlay to show result of committing
+              (setq result (wgrep-make-overlay start (overlay-end ov)))
+              (overlay-put result 'wgrep-result t))
+            (if file-error
+                (wgrep-put-reject-result result file-error)
+              (setq res
+                    (cons
+                     (list buffer linum old new result ov)
+                     res))))))))
     (nreverse res)))
 
 (defun wgrep-compute-transaction ()

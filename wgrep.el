@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 2.1.10
+;; Version: 2.2.0
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -193,10 +193,21 @@ a file."
 (make-obsolete 'wgrep-acceptable-modes nil "2.1.1")
 
 (defconst wgrep-default-line-header-regexp
-  ;; This regexp come from Emacs-25 grep.el
+  ;; This regexp originally come from Emacs-25 grep.el
   ;; Capture subexp 2 is still exists for the backward compatibility.
   ;; But will be removed in future release.
-  "^\\(.*?[^/\n]\\)\\(:[ \t]*\\)\\([1-9][0-9]*\\)[ \t]*:")
+  (eval-when-compile
+    (concat
+     "^"
+     ;; Filename
+     ;; `grep-use-null-filename-separator' may change the separator.
+     "\\([^\n\0]+?\\)"
+     ;; Filename separator (and whitespace)
+     "\\([:\0][\s\t]*\\)"
+     ;; Line number at file
+     "\\([1-9][0-9]*\\)[\s\t]*"
+     ;; Last separator
+     ":")))
 
 (defvar wgrep-line-file-regexp wgrep-default-line-header-regexp
   "Regexp that match to line header of grep result.
@@ -714,7 +725,7 @@ This change will be applied when \\[wgrep-finish-edit]."
   (let* ((next (+ direction line))
          (fregexp (regexp-quote filename)))
     (forward-line direction)
-    (while (looking-at (format "^%s-%d-" fregexp next))
+    (while (looking-at (format "^%s[-\0]%d-" fregexp next))
       (let ((start (match-beginning 0))
             (end (match-end 0))
             (bol (line-beginning-position))

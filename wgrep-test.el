@@ -125,7 +125,10 @@
 
 (ert-deftest wgrep-with-modify ()
   :tags '(wgrep)
-  (let (wgrep-auto-save-buffer)
+  (let (;; This test intended to check modified buffer is existing.
+        ;; Keep that buffer is modifing while calling grep.
+        (grep-save-buffers nil)
+        wgrep-auto-save-buffer)
     (wgrep-test--prepare-file "test-data.txt" "a\nb\nc\n")
     (with-current-buffer (find-file-noselect "test-data.txt")
       ;; modify file buffer
@@ -150,7 +153,7 @@
     (wgrep-finish-edit)
     ;; save to file
     (wgrep-save-all-buffers)
-    ;; compare file contents is valid
+    ;; compare file contents is valid. (keep preceeding file buffer's contents)
     (should (equal "hoge\nfoo\nC\n" (wgrep-test--get-contents "test-data.txt")))
     (wgrep-test--cleanup-file "test-data.txt")))
 

@@ -192,18 +192,12 @@ a file."
 (defvar wgrep-acceptable-modes nil)
 (make-obsolete 'wgrep-acceptable-modes nil "2.1.1")
 
-(defconst wgrep-default-line-header-regexp
-  ;; This regexp come from Emacs-25 grep.el
-  ;; Capture subexp 2 is still exists for the backward compatibility.
-  ;; But will be removed in future release.
-  "^\\(.*?[^/\n]\\)\\(:[ \t]*\\)\\([1-9][0-9]*\\)[ \t]*:")
+(let ((alist (car grep-regexp-alist)))
+  (defconst wgrep-line-file-regexp (nth 0 alist))
+  (defconst wgrep-line-file-regexp-file (nth 1 alist))
+  (defconst wgrep-line-file-regexp-line (nth 2 alist))
+)
 
-(defvar wgrep-line-file-regexp wgrep-default-line-header-regexp
-  "Regexp that match to line header of grep result.
-
-That capture 1: filename 3: line-number
-End of this match equals start of file contents.
-")
 (defvar wgrep-results-parser 'wgrep-parse-command-results)
 (defvar wgrep-header/footer-parser 'wgrep-prepare-header/footer)
 
@@ -642,14 +636,14 @@ This change will be applied when \\[wgrep-finish-edit]."
     (while (not (eobp))
       (cond
        ((looking-at wgrep-line-file-regexp)
-        (let* ((fn (match-string-no-properties 1))
-               (line (string-to-number (match-string 3)))
+        (let* ((fn (match-string-no-properties wgrep-line-file-regexp-file))
+               (line (string-to-number (match-string wgrep-line-file-regexp-line)))
                (start (match-beginning 0))
                (end (match-end 0))
-               (fstart (match-beginning 1))
-               (fend (match-end 1))
-               (lstart (match-beginning 3))
-               (lend (match-end 3))
+               (fstart (match-beginning wgrep-line-file-regexp-file))
+               (fend (match-end wgrep-line-file-regexp-file))
+               (lstart (match-beginning wgrep-line-file-regexp-line))
+               (lend (match-end wgrep-line-file-regexp-line))
                (fprop (wgrep-construct-filename-property fn))
                (flen (length fn)))
           ;; check relative path grep result

@@ -192,22 +192,27 @@ a file."
 (defvar wgrep-acceptable-modes nil)
 (make-obsolete 'wgrep-acceptable-modes nil "2.1.1")
 
+;; These regexp come from `grep-regexp-alist' at grep.el
+(eval-and-compile
+  (defconst wgrep-null-file-separator-header-regexp
+    "\\(?1:[^\0\n]+\\)\\(?:\0\\)\\(?3:[0-9]+\\):")
+
+  (defconst wgrep-colon-file-separator-header-regexp
+    "\\(?1:[^\n:]+?[^\n/:]\\):[\t ]*\\(?3:[1-9][0-9]*\\)[\t ]*:"))
+
+;; Generalized regexp, but wrong matching when colon `:' and null `\0'
+;; is contained in grep result.
 (defconst wgrep-default-line-header-regexp
-  ;; This regexp originally come from Emacs-25 grep.el
-  ;; Capture subexp 2 is still exists for the backward compatibility.
-  ;; But will be removed in future release.
   (eval-when-compile
     (concat
      "^"
-     ;; Filename
-     ;; `grep-use-null-filename-separator' may change the separator.
-     "\\([^\n\0]+?\\)"
-     ;; Filename separator (and whitespace)
-     "\\([:\0][\s\t]*\\)"
-     ;; Line number at file
-     "\\([1-9][0-9]*\\)[\s\t]*"
-     ;; Last separator
-     ":")))
+     "\\(?:"
+     ;; `--null' argument is used.
+     wgrep-null-file-separator-header-regexp
+     "\\|"
+     ;; Fallback regexp
+     wgrep-colon-file-separator-header-regexp
+     "\\)")))
 
 (defvar wgrep-line-file-regexp wgrep-default-line-header-regexp
   "Regexp that match to line header of grep result.
@@ -240,6 +245,21 @@ End of this match equals start of file contents.
 ;;;###autoload
 (defun wgrep-setup ()
   "Setup wgrep preparation."
+  (cond
+   ((and (boundp 'grep-use-null-filename-separator)
+         grep-use-null-filename-separator
+         ;; FIXME: command may contain "--null" text in search text
+         ;; (e.g. grep -nH -e "searching --null argument")
+         ;; `grep-use-null-filename-separator' is non-nil
+         ;; enough to reduce that confusion.
+         (let ((command (car-safe compilation-arguments)))
+           (and (stringp command)
+                (string-match "[\s\t]--null[\s\t]" command))))
+    (set (make-local-variable 'wgrep-line-file-regexp)
+         wgrep-null-file-separator-header-regexp))
+   (t
+    (set (make-local-variable 'wgrep-line-file-regexp)
+         wgrep-colon-file-separator-header-regexp)))
   (wgrep-setup-internal))
 
 (defun wgrep-setup-internal ()

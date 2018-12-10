@@ -335,7 +335,8 @@ End of this match equals start of file contents.
   (unless (file-writable-p file)
     (signal 'wgrep-error (list "File is not writable.")))
   (or (get-file-buffer file)
-      (find-file-noselect file)))
+      (let ((auto-mode-alist '(("*" . fundamental-mode))))
+        (find-file-noselect file))))
 
 (defun wgrep-check-buffer ()
   "Check the file's status. If it is possible to change the file, return t"

@@ -338,12 +338,11 @@ End of this match equals start of file contents.
 (put 'wgrep-error 'error-conditions '(wgrep-error error))
 (put 'wgrep-error 'error-message "wgrep error")
 
-(defun wgrep-get-file (file)
+(defun wgrep-check-file (file)
   (unless (file-exists-p file)
     (signal 'wgrep-error (list "File does not exist.")))
   (unless (file-writable-p file)
-    (signal 'wgrep-error (list "File is not writable.")))
-  file)
+    (signal 'wgrep-error (list "File is not writable."))))
 
 (defun wgrep-get-file-buffer (file)
   (or (get-file-buffer file)
@@ -940,11 +939,6 @@ This change will be applied when \\[wgrep-finish-edit]."
                        (point) 'wgrep-line-filename nil (line-end-position)))
                (file (expand-file-name name default-directory))
                (file-error nil)
-               (_ (condition-case err
-                      (wgrep-get-file file)
-                    (wgrep-error
-                     (setq file-error (cdr err))
-                     nil)))
                (old (overlay-get ov 'wgrep-old-text))
                (new (overlay-get ov 'wgrep-edit-text))
                result)
@@ -958,12 +952,10 @@ This change will be applied when \\[wgrep-finish-edit]."
             ;; create overlay to show result of committing
             (setq result (wgrep-make-overlay start (overlay-end ov)))
             (overlay-put result 'wgrep-result t))
-          (if file-error
-              (wgrep-put-reject-result result file-error)
-            (setq res
-                  (cons
-                   (list file linum old new result ov)
-                   res)))))))
+          (setq res
+                (cons
+                 (list file linum old new result ov)
+                 res))))))
     (nreverse res)))
 
 (defun wgrep-compute-transaction ()
@@ -971,7 +963,7 @@ This change will be applied when \\[wgrep-finish-edit]."
         ;; X ::= FILE . EDITS
         ;; EDITS ::= EDIT [EDIT ...]
         ;; EDIT ::= linum old-text new-text result-overlay edit-overlay
-        all-tran)
+        all-tran tran)
     (dolist (x edit-list)
       (let* ((file (car x))
              (edit (cdr x))
@@ -981,7 +973,21 @@ This change will be applied when \\[wgrep-finish-edit]."
           (setq all-tran (cons pair all-tran)))
         ;; construct with current settings
         (setcdr pair (cons edit (cdr pair)))))
-    all-tran))
+
+    ;; Check file accessibility
+    (dolist (file-tran all-tran)
+      (let ((file (car file-tran)))
+        (condition-case err
+            (progn
+              (wgrep-check-file file)
+              (setq tran (cons file-tran tran)))
+          (wgrep-error
+           (dolist (edit (cdr file-tran))
+             (let ((result (nth 3 edit)))
+               (wgrep-put-reject-result result (cdr err))))
+           nil))))
+
+    tran))
 
 (defun wgrep-commit-file (file tran)
   ;; Apply TRAN to FILE.

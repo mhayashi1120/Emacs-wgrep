@@ -185,6 +185,17 @@ a file."
 (defvar wgrep-original-mode-map nil)
 (make-variable-buffer-local 'wgrep-original-mode-map)
 
+(defvar wgrep-opened-buffers nil)
+
+(defun wgrep-close-edition-buffers ()
+  "Kill buffers opened when applying changes using wgrep."
+  (interactive)
+  (let (newvalue)
+    (dolist (buf wgrep-opened-buffers)
+      (when (and (buffer-live-p buf) (not (kill-buffer buf)))
+        (setq newvalue (cons buf newvalue))))
+    (setq wgrep-opened-buffers (nreverse newvalue))))
+
 ;; Suppress elint warning
 ;; GNU Emacs have this variable at least version 21 or later
 (defvar auto-coding-regexp-alist)
@@ -335,7 +346,10 @@ End of this match equals start of file contents.
   (unless (file-writable-p file)
     (signal 'wgrep-error (list "File is not writable.")))
   (or (get-file-buffer file)
-      (find-file-noselect file)))
+      (let ((buf (find-file-noselect file)))
+        (when buf
+          (setq wgrep-opened-buffers (cons buf wgrep-opened-buffers)))
+        buf)))
 
 (defun wgrep-check-buffer ()
   "Check the file's status. If it is possible to change the file, return t"

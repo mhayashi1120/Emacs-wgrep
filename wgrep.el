@@ -4,7 +4,7 @@
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 2.2.0
+;; Version: 2.3.0
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -105,9 +105,18 @@ Key to enable `wgrep-mode'."
   :type 'string)
 
 (defcustom wgrep-auto-save-buffer nil
-  "Non-nil means do `save-buffer' automatically while `wgrep-finish-edit'."
+  "Non-nil means do `save-buffer' automatically while `wgrep-finish-edit'.
+TODO should be obsolete. Integrate to `wgrep-after-apply-behavior'"
   :group 'wgrep
   :type 'boolean)
+
+(defcustom wgrep-after-apply-behavior nil
+  "TODO"
+  :group 'wgrep
+  :type '(choice
+          (const "keep") (const "nil")
+          (const "save")
+          (const "kill")))
 
 (defvar wgrep-setup-hook nil
   "Hooks to run when setting up wgrep.")
@@ -329,11 +338,14 @@ End of this match equals start of file contents.
 (put 'wgrep-error 'error-conditions '(wgrep-error error))
 (put 'wgrep-error 'error-message "wgrep error")
 
-(defun wgrep-get-file-buffer (file)
+(defun wgrep-get-file (file)
   (unless (file-exists-p file)
     (signal 'wgrep-error (list "File does not exist.")))
   (unless (file-writable-p file)
     (signal 'wgrep-error (list "File is not writable.")))
+  file)
+
+(defun wgrep-get-file-buffer (file)
   (or (get-file-buffer file)
       (find-file-noselect file)))
 
@@ -911,7 +923,7 @@ This change will be applied when \\[wgrep-finish-edit]."
       nil)))
 
 ;; return alist like following
-;; key ::= buffer
+;; key ::= file (absolute-path)
 ;; value ::= linum old-text new-text result-overlay edit-overlay
 (defun wgrep-transaction-editing-list ()
   (let (res)
@@ -928,11 +940,11 @@ This change will be applied when \\[wgrep-finish-edit]."
                        (point) 'wgrep-line-filename nil (line-end-position)))
                (file (expand-file-name name default-directory))
                (file-error nil)
-               (buffer (condition-case err
-                           (wgrep-get-file-buffer file)
-                         (wgrep-error
-                          (setq file-error (cdr err))
-                          nil)))
+               (_ (condition-case err
+                      (wgrep-get-file file)
+                    (wgrep-error
+                     (setq file-error (cdr err))
+                     nil)))
                (old (overlay-get ov 'wgrep-old-text))
                (new (overlay-get ov 'wgrep-edit-text))
                result)
@@ -950,69 +962,68 @@ This change will be applied when \\[wgrep-finish-edit]."
               (wgrep-put-reject-result result file-error)
             (setq res
                   (cons
-                   (list buffer linum old new result ov)
+                   (list file linum old new result ov)
                    res)))))))
     (nreverse res)))
 
 (defun wgrep-compute-transaction ()
   (let ((edit-list (wgrep-transaction-editing-list))
-        ;; key ::= buffer
+        ;; key ::= file
         ;; value ::= edit [edit ...]
         ;; edit ::= linum old-text new-text result-overlay edit-overlay
         all-tran)
     (dolist (x edit-list)
-      (let* ((buffer (car x))
+      (let* ((file (car x))
              (edit (cdr x))
-             (pair (assq buffer all-tran)))
+             (pair (assoc file all-tran)))
         (unless pair
-          (setq pair (cons buffer nil))
+          (setq pair (cons file nil))
           (setq all-tran (cons pair all-tran)))
         ;; construct with current settings
         (setcdr pair (cons edit (cdr pair)))))
-    ;; Convert linum to marker.
-    ;; When new text contains newline destroy linum access.
-    (dolist (buffer-tran all-tran)
-      (let ((buffer (car buffer-tran))
-            (edit-tran (cdr buffer-tran)))
-        (with-current-buffer buffer
-          (save-restriction
-            (widen)
-            (dolist (edit edit-tran)
-              (let ((linum (car edit)))
-                ;; get a marker
-                (wgrep-goto-line linum)
-                (setcar edit (point-marker))))))))
     all-tran))
 
-(defun wgrep-commit-buffer (buffer tran)
-  ;; Apply TRAN to BUFFER.
+(defun wgrep-commit-buffer (file tran)
+  ;; Apply TRAN to FILE.
   ;; See `wgrep-compute-transaction'
-  (with-current-buffer buffer
-    (save-restriction
-      (widen)
-      (wgrep-display-physical-data)
-      (let ((inhibit-read-only wgrep-change-readonly-file)
-            done)
-        (dolist (info tran)
-          (let ((marker (nth 0 info))
-                (old (nth 1 info))
-                (new (nth 2 info))
-                (result (nth 3 info))
-                (ov (nth 4 info)))
-            (condition-case err
-                (progn
-                  ;; check the buffer while each of overlays
-                  ;; to set a result message.
-                  (wgrep-check-buffer)
-                  (wgrep-apply-change marker old new)
-                  (wgrep-put-done-result result)
-                  (delete-overlay ov)
-                  (setq done (cons ov done)))
-              (error
-               (wgrep-put-reject-result result (cdr err))))))
-        (when (and wgrep-auto-save-buffer done)
-          (basic-save-buffer))
-        (nreverse done)))))
+  (let ((buffer (wgrep-get-file-buffer file)))
+    (with-current-buffer buffer
+      (save-restriction
+        (widen)
+        (wgrep-display-physical-data)
+        ;; Convert linum to marker.
+        ;; When new text contains newline destroy linum access.
+        (dolist (edit tran)
+          (let ((linum (car edit)))
+            ;; get a marker
+            (wgrep-goto-line linum)
+            (setcar edit (point-marker))))
+        (let ((inhibit-read-only wgrep-change-readonly-file)
+              done)
+          (dolist (info tran)
+            (let ((marker (nth 0 info))
+                  (old (nth 1 info))
+                  (new (nth 2 info))
+                  (result (nth 3 info))
+                  (ov (nth 4 info)))
+              (condition-case err
+                  (progn
+                    ;; check the buffer while each of overlays
+                    ;; to set a result message.
+                    (wgrep-check-buffer)
+                    (wgrep-apply-change marker old new)
+                    (wgrep-put-done-result result)
+                    (delete-overlay ov)
+                    (setq done (cons ov done)))
+                (error
+                 (wgrep-put-reject-result result (cdr err))))))
+          (when (and (or wgrep-auto-save-buffer
+                         (memq wgrep-after-apply-behavior '(save kill)))
+                     done)
+            (basic-save-buffer))
+          (when (memq wgrep-after-apply-behavior '(kill))
+            (kill-buffer))
+          (nreverse done))))))
 
 (defun wgrep-apply-change (marker old new)
   "The changes in the *grep* buffer are applied to the file.

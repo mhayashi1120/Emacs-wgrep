@@ -3,7 +3,7 @@
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Keywords: grep edit extensions
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep.el
-;; Emacs: GNU Emacs 22 or later
+;; Emacs: GNU Emacs 25 or later
 ;; Version: 2.3.0
 
 ;; This program is free software; you can redistribute it and/or
@@ -539,8 +539,8 @@ These changes are not immediately saved to disk unless
   (interactive)
   (let ((all-tran (wgrep-compute-transaction))
         done)
-    (dolist (buf-tran all-tran)
-      (let ((commited (wgrep-commit-buffer (car buf-tran) (cdr buf-tran))))
+    (dolist (file-tran all-tran)
+      (let ((commited (wgrep-commit-file (car file-tran) (cdr file-tran))))
         (setq done (append done commited))))
     (wgrep-cleanup-temp-buffer)
     (wgrep-to-original-mode)
@@ -922,10 +922,10 @@ This change will be applied when \\[wgrep-finish-edit]."
       (goto-char first)
       nil)))
 
-;; return alist like following
-;; key ::= file (absolute-path)
-;; value ::= linum old-text new-text result-overlay edit-overlay
-(defun wgrep-transaction-editing-list ()
+;; EDIT-LIST ::= EDIT-PAIR...
+;; EDIT-PAIR ::= FILE (absolute-path) . EDIT
+;; EDIT ::= linum old-text new-text result-overlay edit-overlay
+(defun wgrep-gather-edit-list ()
   (let (res)
     (dolist (ov (wgrep-edit-overlays))
       (goto-char (overlay-start ov))
@@ -967,10 +967,10 @@ This change will be applied when \\[wgrep-finish-edit]."
     (nreverse res)))
 
 (defun wgrep-compute-transaction ()
-  (let ((edit-list (wgrep-transaction-editing-list))
-        ;; key ::= file
-        ;; value ::= edit [edit ...]
-        ;; edit ::= linum old-text new-text result-overlay edit-overlay
+  (let ((edit-list (wgrep-gather-edit-list))
+        ;; X ::= FILE . EDITS
+        ;; EDITS ::= EDIT [EDIT ...]
+        ;; EDIT ::= linum old-text new-text result-overlay edit-overlay
         all-tran)
     (dolist (x edit-list)
       (let* ((file (car x))
@@ -983,7 +983,7 @@ This change will be applied when \\[wgrep-finish-edit]."
         (setcdr pair (cons edit (cdr pair)))))
     all-tran))
 
-(defun wgrep-commit-buffer (file tran)
+(defun wgrep-commit-file (file tran)
   ;; Apply TRAN to FILE.
   ;; See `wgrep-compute-transaction'
   (let ((buffer (wgrep-get-file-buffer file)))

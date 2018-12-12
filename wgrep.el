@@ -290,6 +290,10 @@ End of this match equals start of file contents.
   (remove-hook 'post-command-hook 'wgrep-maybe-echo-error-at-point t)
   (run-hooks 'wgrep-setup-hook))
 
+(defun wgrep-grep-process-coding-system ()
+  (or (find-operation-coding-system 'call-process grep-program)
+      (terminal-coding-system)))
+
 (defun wgrep-maybe-echo-error-at-point ()
   (when (null (current-message))
     (let ((ov (catch 'found
@@ -417,8 +421,7 @@ End of this match equals start of file contents.
         ;;        However almost case is ok like this bom function.
         ;;        e.g. (let ((default-process-coding-system 'some-coding))
         ;;               (call-interactively 'grep))
-        (grep-cs (or (find-operation-coding-system 'call-process grep-program)
-                     (terminal-coding-system)))
+        (grep-cs (wgrep-grep-process-coding-system))
         str)
     (if (and regexp
              (setq str (encode-coding-string string grep-cs))
@@ -544,9 +547,15 @@ These changes are not immediately saved to disk unless
   (interactive)
   (let ((tran (wgrep-compute-transaction))
         done)
-    (dolist (file-tran tran)
-      (let ((commited (wgrep-commit-file (car file-tran) (cdr file-tran))))
-        (setq done (append done commited))))
+    ;; TODO check tran length if too many, prompt about process.
+    (while tran
+      (let* ((file-tran (car tran))
+             (commited (wgrep-commit-file (car file-tran) (cdr file-tran))))
+        (setq done (append done commited))
+        (setq tran (cdr tran))
+        ;; TODO re-consider
+        (message "%d file rest..." (length tran))
+        (redisplay t)))
     (wgrep-cleanup-temp-buffer)
     (wgrep-to-original-mode)
     (let ((msg (format "(%d changed)" (length done)))
@@ -993,11 +1002,17 @@ This change will be applied when \\[wgrep-finish-edit]."
 
     (nreverse tran)))
 
+(defun wgrep-open-buffer (file)
+  (let ((buf (generate-new-buffer "*TMP*")))
+    (with-current-buffer buf
+      (insert-file-contents file t))
+    buf))
+
 (defun wgrep-commit-file (file tran)
   ;; Apply TRAN to FILE.
   ;; See `wgrep-compute-transaction'
   (let* ((open-buffer (get-file-buffer file))
-         (buffer (or open-buffer (find-file-noselect file))))
+         (buffer (or open-buffer (wgrep-open-buffer file))))
     (with-current-buffer buffer
       (save-restriction
         (widen)
@@ -1024,6 +1039,9 @@ This change will be applied when \\[wgrep-finish-edit]."
                     (wgrep-check-buffer)
                     (wgrep-apply-change marker old new)
                     (wgrep-put-done-result result)
+                    ;; TODO reconsider it
+                    (with-current-buffer (overlay-buffer result)
+                      (goto-char (overlay-start result)))
                     (delete-overlay ov)
                     (setq done (cons ov done)))
                 (error

@@ -921,10 +921,9 @@ This change will be applied when \\[wgrep-finish-edit]."
       (goto-char first)
       nil)))
 
-;; EDIT-LIST ::= EDIT-PAIR...
-;; EDIT-PAIR ::= FILE (absolute-path) . EDIT
+;; EDITOR ::= FILE (absolute-path) . EDIT
 ;; EDIT ::= linum old-text new-text result-overlay edit-overlay
-(defun wgrep-gather-edit-list ()
+(defun wgrep-gather-editors ()
   (let (res)
     (dolist (ov (wgrep-edit-overlays))
       (goto-char (overlay-start ov))
@@ -959,33 +958,31 @@ This change will be applied when \\[wgrep-finish-edit]."
     (nreverse res)))
 
 (defun wgrep-compute-transaction ()
-  (let ((edit-list (wgrep-gather-edit-list))
-        ;; X ::= FILE . EDITS
-        ;; EDITS ::= EDIT [EDIT ...]
-        ;; EDIT ::= linum old-text new-text result-overlay edit-overlay
-        all-tran tran)
-    (dolist (x edit-list)
-      (let* ((file (car x))
-             (edit (cdr x))
-             (pair (assoc file all-tran)))
-        (unless pair
-          (setq pair (cons file nil))
-          (setq all-tran (cons pair all-tran)))
+  (let ((editors (wgrep-gather-editors))
+        ;; FILE-EDITOR ::= FILE . EDITS
+        ;; EDITS ::= EDIT [...]
+        file-editors tran)
+    (dolist (editor editors)
+      (let* ((file (car editor))
+             (edit (cdr editor))
+             (file-editor (assoc file file-editors)))
+        (unless file-editor
+          (setq file-editor (cons file nil))
+          (setq file-editors (cons file-editor file-editors)))
         ;; construct with current settings
-        (setcdr pair (cons edit (cdr pair)))))
+        (setcdr file-editor (cons edit (cdr file-editor)))))
 
     ;; Check file accessibility
-    (dolist (file-tran all-tran)
-      (let ((file (car file-tran)))
+    (dolist (file-editor file-editors)
+      (let ((file (car file-editor)))
         (condition-case err
             (progn
               (wgrep-check-file file)
-              (setq tran (cons file-tran tran)))
+              (setq tran (cons file-editor tran)))
           (wgrep-error
-           (dolist (edit (cdr file-tran))
+           (dolist (edit (cdr file-editor))
              (let ((result (nth 3 edit)))
-               (wgrep-put-reject-result result (cdr err))))
-           nil))))
+               (wgrep-put-reject-result result (cdr err))))))))
 
     tran))
 

@@ -53,9 +53,14 @@
 ;;
 ;;   M-x wgrep-save-all-buffers
 
+;; * To save and kill buffer automatically when `wgrep-finish-edit'.
+;;   This is useful when too many buffers to close manually.
+;;
+;; (setq wgrep-after-apply-behavior 'kill)
+
 ;; * To save buffer automatically when `wgrep-finish-edit'.
 ;;
-;; (setq wgrep-auto-save-buffer t)
+;; (setq wgrep-after-apply-behavior 'save)
 
 ;; * You can change the default key binding to switch to wgrep.
 ;;
@@ -105,13 +110,18 @@ Key to enable `wgrep-mode'."
   :type 'string)
 
 (defcustom wgrep-auto-save-buffer nil
-  "Non-nil means do `save-buffer' automatically while `wgrep-finish-edit'.
-TODO should be obsolete. Integrate to `wgrep-after-apply-behavior'"
+  "Obsoleted should use `wgrep-after-apply-behavior'."
   :group 'wgrep
   :type 'boolean)
 
+(make-obsolete-variable 'wgrep-auto-save-buffer 'wgrep-after-apply-behavior
+                        "2.3.0")
+
 (defcustom wgrep-after-apply-behavior nil
-  "TODO"
+  "Control behavior after apply *grep* buffer to file buffers.
+`keep' (default) do nothing. Just open and apply changes to the file buffers.
+`save' means do `save-buffer' automatically while `wgrep-finish-edit'.
+`kill' means do like `save' but kill the buffer after save if newly open file."
   :group 'wgrep
   :type '(choice
           (const "keep") (const "nil")
@@ -344,10 +354,6 @@ End of this match equals start of file contents.
   (unless (file-writable-p file)
     (signal 'wgrep-error (list "File is not writable."))))
 
-(defun wgrep-get-file-buffer (file)
-  (or (get-file-buffer file)
-      (find-file-noselect file)))
-
 (defun wgrep-check-buffer ()
   "Check the file's status. If it is possible to change the file, return t"
   (when (and (not wgrep-change-readonly-file)
@@ -534,7 +540,7 @@ End of this match equals start of file contents.
 (defun wgrep-finish-edit ()
   "Apply changes to file buffers.
 These changes are not immediately saved to disk unless
-`wgrep-auto-save-buffer' is non-nil."
+`wgrep-after-apply-behavior' is `save' / `kill'."
   (interactive)
   (let ((all-tran (wgrep-compute-transaction))
         done)
@@ -989,7 +995,8 @@ This change will be applied when \\[wgrep-finish-edit]."
 (defun wgrep-commit-file (file tran)
   ;; Apply TRAN to FILE.
   ;; See `wgrep-compute-transaction'
-  (let ((buffer (wgrep-get-file-buffer file)))
+  (let* ((open-buffer (get-file-buffer file))
+         (buffer (or open-buffer (find-file-noselect file))))
     (with-current-buffer buffer
       (save-restriction
         (widen)
@@ -1024,7 +1031,8 @@ This change will be applied when \\[wgrep-finish-edit]."
                          (memq wgrep-after-apply-behavior '(save kill)))
                      done)
             (basic-save-buffer))
-          (when (memq wgrep-after-apply-behavior '(kill))
+          (when (and (null open-buffer)
+                     (memq wgrep-after-apply-behavior '(kill)))
             (kill-buffer))
           (nreverse done))))))
 

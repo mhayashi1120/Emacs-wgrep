@@ -542,9 +542,9 @@ End of this match equals start of file contents.
 These changes are not immediately saved to disk unless
 `wgrep-after-apply-behavior' is `save' / `kill'."
   (interactive)
-  (let ((all-tran (wgrep-compute-transaction))
+  (let ((tran (wgrep-compute-transaction))
         done)
-    (dolist (file-tran all-tran)
+    (dolist (file-tran tran)
       (let ((commited (wgrep-commit-file (car file-tran) (cdr file-tran))))
         (setq done (append done commited))))
     (wgrep-cleanup-temp-buffer)
@@ -977,6 +977,7 @@ This change will be applied when \\[wgrep-finish-edit]."
           (setq file-editors (cons file-editor file-editors)))
         ;; construct with current settings
         (setcdr file-editor (cons edit (cdr file-editor)))))
+    (setq file-editors (nreverse file-editors))
 
     ;; Check file accessibility
     (dolist (file-editor file-editors)
@@ -990,7 +991,7 @@ This change will be applied when \\[wgrep-finish-edit]."
              (let ((result (nth 3 edit)))
                (wgrep-put-reject-result result (cdr err))))))))
 
-    tran))
+    (nreverse tran)))
 
 (defun wgrep-commit-file (file tran)
   ;; Apply TRAN to FILE.

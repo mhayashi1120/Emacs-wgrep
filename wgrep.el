@@ -546,12 +546,16 @@ These changes are not immediately saved to disk unless
         (setq wgrep-auto-apply-disk t))))
     (while tran
       (let* ((file-tran (car tran))
-             (commited (wgrep-commit-file file-tran)))
+             (commited (wgrep-commit-file file-tran))
+             ;; TODO show progress
+             (result (nth 3 (cadr file-tran))))
+        (when (overlayp result)
+          (goto-char (overlay-start result))
+          (forward-line 0))
         (setq done (+ done commited))
         (setq tran (cdr tran))
-        ;; TODO message
         (let (message-log-max)
-          (message "Processing %d files %d files are left..."
+          (message "Writing %d files, %d files are left..."
                    all-length (length tran)))
         (redisplay t)))
     (wgrep-cleanup-temp-buffer)
@@ -1057,7 +1061,7 @@ This change will be applied when \\[wgrep-finish-edit]."
               (basic-save-buffer))
              (t
               (let ((coding-system-for-write buffer-file-coding-system))
-                (write-region (point-min) (point-max) file))))
+                (write-region (point-min) (point-max) file nil 'no-msg))))
             (when (null open-buffer)
               (kill-buffer)))
           done)))))

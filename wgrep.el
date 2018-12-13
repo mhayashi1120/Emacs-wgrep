@@ -109,6 +109,11 @@ Key to enable `wgrep-mode'."
   :group 'wgrep
   :type 'boolean)
 
+(defcustom wgrep-too-many-file-length 10
+  "Number to detect as too many files."
+  :group 'wgrep
+  :type 'number)
+
 (defvar wgrep-setup-hook nil
   "Hooks to run when setting up wgrep.")
 
@@ -192,7 +197,8 @@ a file."
 (defvar wgrep-acceptable-modes nil)
 (make-obsolete 'wgrep-acceptable-modes nil "2.1.1")
 
-(defvar wgrep-auto-apply-disk nil)
+(defvar wgrep-auto-apply-disk nil
+  "Internal use `wgrep-auto-save-buffer' or too many file is editing.")
 
 ;; These regexp come from `grep-regexp-alist' at grep.el
 (eval-and-compile
@@ -272,10 +278,6 @@ End of this match equals start of file contents.
   (wgrep-cleanup-overlays (point-min) (point-max))
   (remove-hook 'post-command-hook 'wgrep-maybe-echo-error-at-point t)
   (run-hooks 'wgrep-setup-hook))
-
-(defun wgrep-grep-process-coding-system ()
-  (or (find-operation-coding-system 'call-process grep-program)
-      (terminal-coding-system)))
 
 (defun wgrep-maybe-echo-error-at-point ()
   (when (null (current-message))
@@ -404,7 +406,8 @@ End of this match equals start of file contents.
         ;;        However almost case is ok like this bom function.
         ;;        e.g. (let ((default-process-coding-system 'some-coding))
         ;;               (call-interactively 'grep))
-        (grep-cs (wgrep-grep-process-coding-system))
+        (grep-cs (or (find-operation-coding-system 'call-process grep-program)
+                     (terminal-coding-system)))
         str)
     (if (and regexp
              (setq str (encode-coding-string string grep-cs))
@@ -530,22 +533,34 @@ These changes are not immediately saved to disk unless
   (interactive)
   (let* ((tran (wgrep-compute-transaction))
          (all-length (length tran))
-         done)
-    ;; TODO check tran length if too many, prompt about process.
+         (wgrep-auto-apply-disk nil)
+         (done 0))
+    (cond
+     (wgrep-auto-save-buffer
+      (setq wgrep-auto-apply-disk t))
+     ((> all-length wgrep-too-many-file-length)
+      (when (y-or-n-p (eval-when-compile
+                        (concat
+                         "Edited files are too many." 
+                         " Apply the changes to disk with non-confirmation?")))
+        (setq wgrep-auto-apply-disk t))))
     (while tran
       (let* ((file-tran (car tran))
              (commited (wgrep-commit-file file-tran)))
-        (setq done (append done commited))
+        (setq done (+ done commited))
         (setq tran (cdr tran))
-        (message "Processing %d of %d files..." (length tran) all-length)
+        ;; TODO message
+        (let (message-log-max)
+          (message "Processing %d files %d files are left..."
+                   all-length (length tran)))
         (redisplay t)))
     (wgrep-cleanup-temp-buffer)
     (wgrep-to-original-mode)
-    (let ((msg (format "(%d changed)" (length done)))
+    (let ((msg (format "(%d changed)" done))
           (ovs (wgrep-edit-overlays)))
       (cond
        ((null ovs)
-        (if (= (length done) 0)
+        (if (= done 0)
             (message "(No changes to be performed)")
           (message "Successfully finished. %s" msg)))
        ((= (length ovs) 1)
@@ -1003,11 +1018,11 @@ This change will be applied when \\[wgrep-finish-edit]."
          (buffer
           (cond
            (open-buffer open-buffer)
-           (wgrep-auto-save-buffer
-            (let ((buf (generate-new-buffer "*TODO TMP*")))
+           (wgrep-auto-apply-disk
+            (let ((buf (generate-new-buffer "*TMP <wgrep>*")))
               (with-current-buffer buf
-                (let ((coding-system-for-read (wgrep-grep-process-coding-system)))
-                  (insert-file-contents file)))
+                ;; To detect coding-system and set `buffer-file-coding-system'.
+                (insert-file-contents file))
               buf))
            (t
             (find-file-noselect file)))))
@@ -1016,7 +1031,7 @@ This change will be applied when \\[wgrep-finish-edit]."
         (widen)
         (wgrep-display-physical-data)
         (wgrep-compute-linum-to-marker tran)
-        (let ((done '()))
+        (let ((done 0))
           (let ((inhibit-read-only wgrep-change-readonly-file))
             (dolist (info tran)
               (let ((marker (nth 0 info))
@@ -1032,20 +1047,20 @@ This change will be applied when \\[wgrep-finish-edit]."
                       (wgrep-apply-change marker old new)
                       (wgrep-put-done-result result)
                       (delete-overlay ov)
-                      (setq done (cons ov done)))
+                      (setq done (1+ done)))
                   (error
                    (wgrep-put-reject-result result (cdr err)))))))
-          (when (and wgrep-auto-save-buffer
-                     done)
+          (when (and wgrep-auto-apply-disk
+                     (> done 0))
             (cond
              (buffer-file-name
               (basic-save-buffer))
              (t
-              (let ((coding-system-for-write (wgrep-grep-process-coding-system)))
+              (let ((coding-system-for-write buffer-file-coding-system))
                 (write-region (point-min) (point-max) file))))
             (when (null open-buffer)
               (kill-buffer)))
-          (nreverse done))))))
+          done)))))
 
 (defun wgrep-apply-change (marker old new)
   "The changes in the *grep* buffer are applied to the file.

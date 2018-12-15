@@ -234,41 +234,6 @@ End of this match equals start of file contents.
 (defvar wgrep-inhibit-modification-hook nil)
 
 (defvar wgrep-mode-map nil)
-(unless wgrep-mode-map
-  (let ((map (make-sparse-keymap)))
-
-    (define-key map "\C-c\C-c" 'wgrep-finish-edit)
-    (define-key map "\C-c\C-d" 'wgrep-mark-deletion)
-    (define-key map "\C-c\C-e" 'wgrep-finish-edit)
-    (define-key map "\C-c\C-p" 'wgrep-toggle-readonly-area)
-    (define-key map "\C-c\C-r" 'wgrep-remove-change)
-    (define-key map "\C-x\C-s" 'wgrep-finish-edit)
-    (define-key map "\C-c\C-u" 'wgrep-remove-all-change)
-    (define-key map "\C-c\C-[" 'wgrep-remove-all-change)
-    (define-key map "\C-c\C-k" 'wgrep-abort-changes)
-    (define-key map "\C-x\C-q" 'wgrep-exit)
-
-    (setq wgrep-mode-map map)))
-
-;;;###autoload
-(defun wgrep-setup ()
-  "Setup wgrep preparation."
-  (cond
-   ((and (boundp 'grep-use-null-filename-separator)
-         grep-use-null-filename-separator
-         ;; FIXME: command may contain "--null" text in search text
-         ;; (e.g. grep -nH -e "searching --null argument")
-         ;; `grep-use-null-filename-separator' is non-nil
-         ;; enough to reduce that confusion.
-         (let ((command (car-safe compilation-arguments)))
-           (and (stringp command)
-                (string-match "[\s\t]--null[\s\t]" command))))
-    (set (make-local-variable 'wgrep-line-file-regexp)
-         wgrep-null-file-separator-header-regexp))
-   (t
-    (set (make-local-variable 'wgrep-line-file-regexp)
-         wgrep-colon-file-separator-header-regexp)))
-  (wgrep-setup-internal))
 
 (defun wgrep-setup-internal ()
   (setq wgrep-original-mode-map (current-local-map))
@@ -525,168 +490,6 @@ End of this match equals start of file contents.
   (set-buffer-modified-p nil)
   (setq buffer-undo-list nil)
   (setq buffer-read-only t))
-
-(defun wgrep-finish-edit ()
-  "Apply changes to file buffers.
-These changes are not immediately saved to disk unless
-`wgrep-auto-save-buffer' is non-nil."
-  (interactive)
-  (let* ((tran (wgrep-compute-transaction))
-         (all-length (length tran))
-         (wgrep-auto-apply-disk nil)
-         (done 0))
-    (cond
-     (wgrep-auto-save-buffer
-      (setq wgrep-auto-apply-disk t))
-     ((> all-length wgrep-too-many-file-length)
-      (when (y-or-n-p (eval-when-compile
-                        (concat
-                         "Edited files are too many." 
-                         " Apply the changes to disk with non-confirmation?")))
-        (setq wgrep-auto-apply-disk t))))
-    (while tran
-      (let* ((file-tran (car tran))
-             (commited (wgrep-commit-file file-tran))
-             ;; TODO show progress
-             (result (nth 3 (cadr file-tran))))
-        (when (overlayp result)
-          (goto-char (overlay-start result))
-          (forward-line 0))
-        (setq done (+ done commited))
-        (setq tran (cdr tran))
-        (let (message-log-max)
-          (message "Writing %d files, %d files are left..."
-                   all-length (length tran)))
-        (redisplay t)))
-    (wgrep-cleanup-temp-buffer)
-    (wgrep-to-original-mode)
-    (let ((msg (format "(%d changed)" done))
-          (ovs (wgrep-edit-overlays)))
-      (cond
-       ((null ovs)
-        (if (= done 0)
-            (message "(No changes to be performed)")
-          (message "Successfully finished. %s" msg)))
-       ((= (length ovs) 1)
-        (message "There is an unapplied change. %s" msg))
-       (t
-        (message "There are %d unapplied changes. %s"
-                 (length ovs) msg))))))
-
-(defun wgrep-exit ()
-  "Return to original mode."
-  (interactive)
-  (if (and (buffer-modified-p)
-           (y-or-n-p (format "Buffer %s modified; save changes? "
-                             (current-buffer))))
-      (wgrep-finish-edit)
-    (wgrep-abort-changes)))
-
-(defun wgrep-abort-changes ()
-  "Discard all changes and return to original mode."
-  (interactive)
-  (wgrep-cleanup-overlays (point-min) (point-max))
-  (wgrep-restore-from-temp-buffer)
-  (wgrep-to-original-mode)
-  (message "Changes discarded"))
-
-(defun wgrep-remove-change (beg end)
-  "Remove changes in the region between BEG and END."
-  (interactive "r")
-  (wgrep-cleanup-overlays beg end)
-  (setq mark-active nil))
-
-(defun wgrep-remove-all-change ()
-  "Remove changes in the whole buffer."
-  (interactive)
-  (wgrep-cleanup-overlays (point-min) (point-max)))
-
-(defun wgrep-toggle-readonly-area ()
-  "Toggle read-only area to remove a whole line.
-
-See the following example: you obviously don't want to edit the first line.
-If grep matches a lot of lines, it's hard to edit the grep buffer.
-After toggling to editable, you can call
-`delete-matching-lines', `delete-non-matching-lines'.
-
-Example:
-----------------------------------------------
-./.svn/text-base/some.el.svn-base:87:(hoge)
-./some.el:87:(hoge)
-----------------------------------------------
-"
-  (interactive)
-  (let ((modified (buffer-modified-p))
-        (read-only (not wgrep-readonly-state)))
-    (wgrep-set-readonly-area read-only)
-    (wgrep-set-header/footer-read-only read-only)
-    (set-buffer-modified-p modified)
-    (if wgrep-readonly-state
-        (message "Removing the whole line is now disabled.")
-      (message "Removing the whole line is now enabled."))))
-
-(defun wgrep-change-to-wgrep-mode ()
-  "Change to wgrep mode.
-
-When the *grep* buffer is huge, this might freeze your Emacs
-for several minutes.
-"
-  (interactive)
-  (unless (wgrep-process-exited-p)
-    (error "Active process working"))
-  (wgrep-prepare-to-edit)
-  (wgrep-set-readonly-area t)
-  (set (make-local-variable 'query-replace-skip-read-only) t)
-  (add-hook 'after-change-functions 'wgrep-after-change-function nil t)
-  (add-hook 'post-command-hook 'wgrep-maybe-echo-error-at-point nil t)
-  (use-local-map wgrep-mode-map)
-  (buffer-disable-undo)
-  (wgrep-clone-to-temp-buffer)
-  (setq buffer-read-only nil)
-  (buffer-enable-undo)
-  ;; restore modified status
-  (set-buffer-modified-p (wgrep-edit-overlays))
-  (setq buffer-undo-list nil)
-  (message "%s" (substitute-command-keys
-                 "Press \\[wgrep-finish-edit] when finished \
-or \\[wgrep-abort-changes] to abort changes.")))
-
-(defun wgrep-save-all-buffers ()
-  "Save the buffers that wgrep changed."
-  (interactive)
-  (let ((count 0))
-    (dolist (b (buffer-list))
-      (with-current-buffer b
-        (let ((ovs (wgrep-file-overlays)))
-        (when (and ovs (buffer-modified-p))
-          (basic-save-buffer)
-          (setq count (1+ count))))))
-    (cond
-     ((= count 0)
-      (message "No buffer has been saved."))
-     ((= count 1)
-      (message "Buffer has been saved."))
-     (t
-      (message "%d buffers have been saved." count)))))
-
-(defun wgrep-mark-deletion ()
-  "Mark as delete to current line.
-This change will be applied when \\[wgrep-finish-edit]."
-  (interactive)
-  (save-excursion
-    (let ((ov (wgrep-editing-overlay)))
-      (unless ov
-        (error "Not a grep result"))
-      (condition-case nil
-          (progn
-            (overlay-put ov 'wgrep-edit-text nil)
-            (let ((wgrep-inhibit-modification-hook t)
-                  (begin (overlay-get ov 'wgrep-contents-begin))
-                  (end (overlay-end ov)))
-              (delete-region begin end)
-              (overlay-put ov 'face 'wgrep-delete-face)))
-        (error
-         (delete-overlay ov))))))
 
 (defun wgrep-prepare-context ()
   (save-restriction
@@ -1089,6 +892,212 @@ NEW may be nil this means deleting whole line."
      (t
       ;; new nil means flush whole line.
       (wgrep-flush-whole-line)))))
+
+;;;
+;;; Commands
+;;;
+
+(defun wgrep-finish-edit ()
+  "Apply changes to file buffers.
+These changes are not immediately saved to disk unless
+`wgrep-auto-save-buffer' is non-nil."
+  (interactive)
+  (let* ((tran (wgrep-compute-transaction))
+         (all-length (length tran))
+         (wgrep-auto-apply-disk nil)
+         (done 0))
+    (cond
+     (wgrep-auto-save-buffer
+      (setq wgrep-auto-apply-disk t))
+     ((> all-length wgrep-too-many-file-length)
+      (when (y-or-n-p (eval-when-compile
+                        (concat
+                         "Edited files are too many." 
+                         " Apply the changes to disk with non-confirmation?")))
+        (setq wgrep-auto-apply-disk t))))
+    (while tran
+      (let* ((file-tran (car tran))
+             (commited (wgrep-commit-file file-tran))
+             ;; TODO show progress
+             (result (nth 3 (cadr file-tran))))
+        (when (overlayp result)
+          (goto-char (overlay-start result))
+          (forward-line 0))
+        (setq done (+ done commited))
+        (setq tran (cdr tran))
+        (let (message-log-max)
+          (message "Writing %d files, %d files are left..."
+                   all-length (length tran)))
+        (redisplay t)))
+    (wgrep-cleanup-temp-buffer)
+    (wgrep-to-original-mode)
+    (let ((msg (format "(%d changed)" done))
+          (ovs (wgrep-edit-overlays)))
+      (cond
+       ((null ovs)
+        (if (= done 0)
+            (message "(No changes to be performed)")
+          (message "Successfully finished. %s" msg)))
+       ((= (length ovs) 1)
+        (message "There is an unapplied change. %s" msg))
+       (t
+        (message "There are %d unapplied changes. %s"
+                 (length ovs) msg))))))
+
+(defun wgrep-exit ()
+  "Return to original mode."
+  (interactive)
+  (if (and (buffer-modified-p)
+           (y-or-n-p (format "Buffer %s modified; save changes? "
+                             (current-buffer))))
+      (wgrep-finish-edit)
+    (wgrep-abort-changes)))
+
+(defun wgrep-abort-changes ()
+  "Discard all changes and return to original mode."
+  (interactive)
+  (wgrep-cleanup-overlays (point-min) (point-max))
+  (wgrep-restore-from-temp-buffer)
+  (wgrep-to-original-mode)
+  (message "Changes discarded"))
+
+(defun wgrep-remove-change (beg end)
+  "Remove changes in the region between BEG and END."
+  (interactive "r")
+  (wgrep-cleanup-overlays beg end)
+  (setq mark-active nil))
+
+(defun wgrep-remove-all-change ()
+  "Remove changes in the whole buffer."
+  (interactive)
+  (wgrep-cleanup-overlays (point-min) (point-max)))
+
+(defun wgrep-toggle-readonly-area ()
+  "Toggle read-only area to remove a whole line.
+
+See the following example: you obviously don't want to edit the first line.
+If grep matches a lot of lines, it's hard to edit the grep buffer.
+After toggling to editable, you can call
+`delete-matching-lines', `delete-non-matching-lines'.
+
+Example:
+----------------------------------------------
+./.svn/text-base/some.el.svn-base:87:(hoge)
+./some.el:87:(hoge)
+----------------------------------------------
+"
+  (interactive)
+  (let ((modified (buffer-modified-p))
+        (read-only (not wgrep-readonly-state)))
+    (wgrep-set-readonly-area read-only)
+    (wgrep-set-header/footer-read-only read-only)
+    (set-buffer-modified-p modified)
+    (if wgrep-readonly-state
+        (message "Removing the whole line is now disabled.")
+      (message "Removing the whole line is now enabled."))))
+
+(defun wgrep-change-to-wgrep-mode ()
+  "Change to wgrep mode.
+
+When the *grep* buffer is huge, this might freeze your Emacs
+for several minutes.
+"
+  (interactive)
+  (unless (wgrep-process-exited-p)
+    (error "Active process working"))
+  (wgrep-prepare-to-edit)
+  (wgrep-set-readonly-area t)
+  (set (make-local-variable 'query-replace-skip-read-only) t)
+  (add-hook 'after-change-functions 'wgrep-after-change-function nil t)
+  (add-hook 'post-command-hook 'wgrep-maybe-echo-error-at-point nil t)
+  (use-local-map wgrep-mode-map)
+  (buffer-disable-undo)
+  (wgrep-clone-to-temp-buffer)
+  (setq buffer-read-only nil)
+  (buffer-enable-undo)
+  ;; restore modified status
+  (set-buffer-modified-p (wgrep-edit-overlays))
+  (setq buffer-undo-list nil)
+  (message "%s" (substitute-command-keys
+                 "Press \\[wgrep-finish-edit] when finished \
+or \\[wgrep-abort-changes] to abort changes.")))
+
+(defun wgrep-save-all-buffers ()
+  "Save the buffers that wgrep changed."
+  (interactive)
+  (let ((count 0))
+    (dolist (b (buffer-list))
+      (with-current-buffer b
+        (let ((ovs (wgrep-file-overlays)))
+        (when (and ovs (buffer-modified-p))
+          (basic-save-buffer)
+          (setq count (1+ count))))))
+    (cond
+     ((= count 0)
+      (message "No buffer has been saved."))
+     ((= count 1)
+      (message "Buffer has been saved."))
+     (t
+      (message "%d buffers have been saved." count)))))
+
+(defun wgrep-mark-deletion ()
+  "Mark as delete to current line.
+This change will be applied when \\[wgrep-finish-edit]."
+  (interactive)
+  (save-excursion
+    (let ((ov (wgrep-editing-overlay)))
+      (unless ov
+        (error "Not a grep result"))
+      (condition-case nil
+          (progn
+            (overlay-put ov 'wgrep-edit-text nil)
+            (let ((wgrep-inhibit-modification-hook t)
+                  (begin (overlay-get ov 'wgrep-contents-begin))
+                  (end (overlay-end ov)))
+              (delete-region begin end)
+              (overlay-put ov 'face 'wgrep-delete-face)))
+        (error
+         (delete-overlay ov))))))
+
+(unless wgrep-mode-map
+  (let ((map (make-sparse-keymap)))
+
+    (define-key map "\C-c\C-c" 'wgrep-finish-edit)
+    (define-key map "\C-c\C-d" 'wgrep-mark-deletion)
+    (define-key map "\C-c\C-e" 'wgrep-finish-edit)
+    (define-key map "\C-c\C-p" 'wgrep-toggle-readonly-area)
+    (define-key map "\C-c\C-r" 'wgrep-remove-change)
+    (define-key map "\C-x\C-s" 'wgrep-finish-edit)
+    (define-key map "\C-c\C-u" 'wgrep-remove-all-change)
+    (define-key map "\C-c\C-[" 'wgrep-remove-all-change)
+    (define-key map "\C-c\C-k" 'wgrep-abort-changes)
+    (define-key map "\C-x\C-q" 'wgrep-exit)
+
+    (setq wgrep-mode-map map)))
+
+;;;
+;;; Entry point
+;;;
+
+;;;###autoload
+(defun wgrep-setup ()
+  "Setup wgrep preparation."
+  (cond
+   ((and (boundp 'grep-use-null-filename-separator)
+         grep-use-null-filename-separator
+         ;; FIXME: command may contain "--null" text in search text
+         ;; (e.g. grep -nH -e "searching --null argument")
+         ;; `grep-use-null-filename-separator' is non-nil
+         ;; enough to reduce that confusion.
+         (let ((command (car-safe compilation-arguments)))
+           (and (stringp command)
+                (string-match "[\s\t]--null[\s\t]" command))))
+    (set (make-local-variable 'wgrep-line-file-regexp)
+         wgrep-null-file-separator-header-regexp))
+   (t
+    (set (make-local-variable 'wgrep-line-file-regexp)
+         wgrep-colon-file-separator-header-regexp)))
+  (wgrep-setup-internal))
 
 ;;;
 ;;; activate/deactivate marmalade install or github install.

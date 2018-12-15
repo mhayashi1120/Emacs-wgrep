@@ -255,50 +255,6 @@ End of this match equals start of file contents.
         (let (message-log-max)
           (message "%s" (overlay-get ov 'wgrep-reject-message)))))))
 
-(defun wgrep-set-readonly-area (state)
-  (let ((inhibit-read-only t)
-        (wgrep-inhibit-modification-hook t)
-        pos start end)
-    (save-excursion
-      ;; set readonly grep result filename
-      (setq pos (point-min))
-      (while (setq start (next-single-property-change
-                          pos 'wgrep-line-filename))
-        (setq end (next-single-property-change
-                   start 'wgrep-line-filename))
-        (put-text-property start end 'read-only state)
-        (put-text-property (1- end) end 'rear-nonsticky t)
-        ;; set readonly all newline at end of grep line
-        (when (eq (char-before start) ?\n)
-          (put-text-property (1- start) start 'read-only state))
-        (setq pos end))
-      (setq pos (point-min))
-      (while (setq start (next-single-property-change
-                          pos 'wgrep-ignore))
-        (setq end (next-single-property-change
-                   start 'wgrep-ignore))
-        (put-text-property start end 'read-only state)
-        ;; set readonly all newline at end of grep line
-        (when (eq (char-before start) ?\n)
-          (put-text-property (1- start) start 'read-only state))
-        (setq pos end))
-      ;; set readonly last of grep line
-      (let ((footer (or (next-single-property-change (point-min) 'wgrep-footer)
-                        ;; to consider empty footer.
-                        (point-max))))
-        (when (eq (char-before footer) ?\n)
-          (put-text-property (1- footer) footer 'read-only state))))
-    (setq wgrep-readonly-state state)))
-
-(defun wgrep-after-change-function (beg end leng-before)
-  (cond
-   (wgrep-inhibit-modification-hook nil)
-   ((= (point-min) (point-max))
-    ;; cleanup when first executing
-    (wgrep-cleanup-overlays (point-min) (point-max)))
-   (t
-    (wgrep-put-change-face beg end))))
-
 (put 'wgrep-error 'error-conditions '(wgrep-error error))
 (put 'wgrep-error 'error-message "wgrep error")
 
@@ -346,23 +302,6 @@ End of this match equals start of file contents.
           (setq res (cons ov res))))
       (nreverse res))))
 
-(defun wgrep-replace-to-new-line (new-text)
-  ;; delete grep extracted region (restricted to a line)
-  (delete-region (line-beginning-position) (line-end-position))
-  (let ((beg (point))
-        end)
-    (insert new-text)
-    (let* ((end (point))
-           ;; hilight the changed line
-           (ov (wgrep-put-overlay-to-file-buffer beg end)))
-      ;; make overlay volatile.
-      (wgrep-let-destructive-overlay ov))))
-
-(defun wgrep-flush-whole-line ()
-  (wgrep-put-overlay-to-file-buffer
-   (line-beginning-position) (line-end-position))
-  (wgrep-delete-whole-line))
-
 ;;Hack function
 (defun wgrep-string-replace-bom (string cs)
   (let ((regexp (car (rassq (coding-system-base cs) auto-coding-regexp-alist)))
@@ -380,54 +319,12 @@ End of this match equals start of file contents.
         (decode-coding-string (substring str (match-end 0)) cs)
       string)))
 
-(defun wgrep-put-overlay-to-file-buffer (beg end)
-  "*Highlight the changes in the file"
-  (let ((ov
-         (catch 'done
-           (dolist (o (overlays-in beg end))
-             (when (overlay-get o 'wgrep)
-               (move-overlay o beg end)
-               (throw 'done o)))
-           (wgrep-make-overlay beg end))))
-    (overlay-put ov 'face 'wgrep-file-face)
-    (overlay-put ov 'priority 0)
-    (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)
-    ov))
-
-(defun wgrep-put-done-result (ov)
-  (wgrep-set-result ov 'wgrep-done-face))
-
-(defun wgrep-put-reject-result (ov error-data)
-  (let ((message (mapconcat (lambda (x) (format "%s" x)) error-data " ")))
-    (wgrep-set-result ov 'wgrep-reject-face message)))
-
-(defun wgrep-set-result (ov face &optional message)
-  (overlay-put ov 'face face)
-  (overlay-put ov 'priority 1)
-  (overlay-put ov 'wgrep-reject-message message))
-
 (defun wgrep-edit-overlays ()
   (let (res)
     (dolist (ov (overlays-in (point-min) (point-max)))
       (when (overlay-get ov 'wgrep-changed)
         (setq res (cons ov res))))
     (nreverse res)))
-
-(defun wgrep-put-change-face (beg end)
-  (save-excursion
-    ;; `looking-at' may destroy match data while replace by regexp.
-    (save-match-data
-      (let ((ov (wgrep-editing-overlay beg end)))
-        ;; delete overlay if text is same as old value.
-        (cond
-         ;; not a valid point
-         ((null ov))
-         ((string= (overlay-get ov 'wgrep-old-text)
-                   (overlay-get ov 'wgrep-edit-text))
-          ;; back to unchanged
-          (delete-overlay ov))
-         (t
-          (overlay-put ov 'face 'wgrep-face)))))))
 
 ;; get overlay BEG and END is passed by `after-change-functions'
 (defun wgrep-editing-overlay (&optional start end)
@@ -491,54 +388,6 @@ End of this match equals start of file contents.
   (setq buffer-undo-list nil)
   (setq buffer-read-only t))
 
-(defun wgrep-prepare-context ()
-  (save-restriction
-    (let ((start (wgrep-goto-first-found))
-          (end (wgrep-goto-end-of-found)))
-      (narrow-to-region start end)
-      (goto-char (point-min))
-      (funcall wgrep-results-parser))))
-
-(defun wgrep-parse-command-results ()
-  (let ((cache (make-hash-table)))
-    (while (not (eobp))
-      (cond
-       ((looking-at wgrep-line-file-regexp)
-        (let* ((fn (match-string-no-properties 1))
-               (line (string-to-number (match-string 3)))
-               (start (match-beginning 0))
-               (end (match-end 0))
-               (fstart (match-beginning 1))
-               (fend (match-end 1))
-               (lstart (match-beginning 3))
-               (lend (match-end 3))
-               (fprop (wgrep-construct-filename-property fn))
-               (flen (length fn)))
-          ;; check relative path grep result
-          ;; grep result may be --context result with number between 2 colon.
-          ;; ./filename-1-:10:
-          ;; that make misunderstand font-locking
-          ;; check file existence decrease risk of the misunderstanding.
-          (when (or (gethash fn cache nil)
-                    (and (file-exists-p fn)
-                         (puthash fn t cache)))
-            (put-text-property start end 'wgrep-line-filename fn)
-            (put-text-property start end 'wgrep-line-number line)
-            (put-text-property start (+ start flen) fprop fn)
-            ;; handle backward and forward following options.
-            ;; -A (--after-context) -B (--before-context) -C (--context)
-            (save-excursion
-              (wgrep-prepare-context-while fn line -1 fprop flen))
-            (wgrep-prepare-context-while fn line 1 fprop flen)
-            ;; end of context output `--'.
-            (forward-line -1))))
-       (t
-        ;; Add property but this may be removed by `wgrep-prepare-context-while'
-        (put-text-property
-         (line-beginning-position) (line-end-position)
-         'wgrep-ignore t)))
-      (forward-line 1))))
-
 (defun wgrep-delete-whole-line ()
   (delete-region (line-beginning-position) (line-beginning-position 2)))
 
@@ -566,28 +415,6 @@ End of this match equals start of file contents.
   (goto-char (point-min))
   (forward-line (1- line)))
 
-;; -A -B -C output may be misunderstood and set read-only.
-;; Context match break font-lock if context have at least two `:'.
-;; e.g.
-;; filename-1-2010-01-01 23:59:99
-;; filename:2:hoge
-;; filename-3-20:10:25
-(defun wgrep-prepare-context-while (filename line direction fprop flen)
-  (let* ((next (+ direction line))
-         (fregexp (regexp-quote filename)))
-    (forward-line direction)
-    (while (looking-at (format "^%s[-\0]%d-" fregexp next))
-      (let ((start (match-beginning 0))
-            (end (match-end 0))
-            (bol (line-beginning-position))
-            (eol (line-end-position)))
-        (put-text-property start end 'wgrep-line-filename filename)
-        (put-text-property start end 'wgrep-line-number next)
-        (put-text-property start (+ start flen) fprop filename)
-        (remove-text-properties bol eol '(wgrep-ignore))
-        (forward-line direction)
-        (setq next (+ direction next))))))
-
 (defun wgrep-construct-filename-property (filename)
   (intern (format "wgrep-fn-%s" filename)))
 
@@ -595,48 +422,6 @@ End of this match equals start of file contents.
   (let ((proc (get-buffer-process (current-buffer))))
     (or (null proc)
         (eq (process-status proc) 'exit))))
-
-(defun wgrep-prepare-to-edit ()
-  (unless wgrep-prepared
-    (save-excursion
-      (let ((inhibit-read-only t)
-            (wgrep-inhibit-modification-hook t)
-            buffer-read-only)
-        (funcall wgrep-header/footer-parser)
-        (wgrep-prepare-context)
-        (setq wgrep-prepared t)))))
-
-(defun wgrep-prepare-header/footer ()
-  (let (beg end)
-    ;; Set read-only grep result header
-    (goto-char (point-min))
-    (setq beg (point-min))
-    ;; See `compilation-start'
-    (forward-line 4)
-    (setq end (point))
-    (put-text-property beg end 'read-only t)
-    (put-text-property beg end 'wgrep-header t)
-    ;; Set read-only grep result footer
-    (goto-char (point-max))
-    (forward-line -1)
-    (when (re-search-backward "^$" end t)
-      (setq beg (point))
-      (setq end (point-max))
-      (when beg
-        (put-text-property beg end 'read-only t)
-        (put-text-property beg end 'wgrep-footer t)))))
-
-(defun wgrep-set-header/footer-read-only (state)
-  (let ((inhibit-read-only t)
-        (wgrep-inhibit-modification-hook t))
-    ;; header
-    (let ((header-end (next-single-property-change (point-min) 'wgrep-header)))
-      (when header-end
-        (put-text-property (point-min) header-end 'read-only state)))
-    ;; footer
-    (let ((footer-beg (next-single-property-change (point-min) 'wgrep-footer)))
-      (when footer-beg
-        (put-text-property footer-beg (point-max) 'read-only state)))))
 
 (defun wgrep-cleanup-overlays (beg end)
   (dolist (ov (overlays-in beg end))
@@ -658,32 +443,6 @@ End of this match equals start of file contents.
     (with-current-buffer tmpbuf
       (setq wgrep-sibling-buffer grepbuf))
     tmpbuf))
-
-(defun wgrep-restore-from-temp-buffer ()
-  (cond
-   ((and wgrep-sibling-buffer
-         (buffer-live-p wgrep-sibling-buffer))
-    (let ((grepbuf (current-buffer))
-          (tmpbuf wgrep-sibling-buffer)
-          (header (wgrep-current-file-and-linum))
-          (savedc (current-column))
-          (savedp (point))
-          (inhibit-read-only t)
-          (wgrep-inhibit-modification-hook t)
-          buffer-read-only)
-      (erase-buffer)
-      (with-current-buffer tmpbuf
-        (append-to-buffer grepbuf (point-min) (point-max)))
-      (goto-char (point-min))
-      ;; restore previous cursor
-      (or (and header
-               (apply 'wgrep-goto-grep-line header)
-               (move-to-column savedc))
-          (goto-char (min (point-max) savedp)))
-      (wgrep-cleanup-temp-buffer)))
-   (t
-    ;; non fatal error
-    (message "Error! Saved buffer is unavailable."))))
 
 (defun wgrep-cleanup-temp-buffer ()
   "Cleanup temp buffer in *grep* buffer."
@@ -740,6 +499,260 @@ End of this match equals start of file contents.
           (forward-line 1)))
       (goto-char first)
       nil)))
+
+;;;
+;;; Prepare grep <-> wgrep
+;;;
+
+(defun wgrep-set-readonly-area (state)
+  (let ((inhibit-read-only t)
+        (wgrep-inhibit-modification-hook t)
+        pos start end)
+    (save-excursion
+      ;; set readonly grep result filename
+      (setq pos (point-min))
+      (while (setq start (next-single-property-change
+                          pos 'wgrep-line-filename))
+        (setq end (next-single-property-change
+                   start 'wgrep-line-filename))
+        (put-text-property start end 'read-only state)
+        (put-text-property (1- end) end 'rear-nonsticky t)
+        ;; set readonly all newline at end of grep line
+        (when (eq (char-before start) ?\n)
+          (put-text-property (1- start) start 'read-only state))
+        (setq pos end))
+      (setq pos (point-min))
+      (while (setq start (next-single-property-change
+                          pos 'wgrep-ignore))
+        (setq end (next-single-property-change
+                   start 'wgrep-ignore))
+        (put-text-property start end 'read-only state)
+        ;; set readonly all newline at end of grep line
+        (when (eq (char-before start) ?\n)
+          (put-text-property (1- start) start 'read-only state))
+        (setq pos end))
+      ;; set readonly last of grep line
+      (let ((footer (or (next-single-property-change (point-min) 'wgrep-footer)
+                        ;; to consider empty footer.
+                        (point-max))))
+        (when (eq (char-before footer) ?\n)
+          (put-text-property (1- footer) footer 'read-only state))))
+    (setq wgrep-readonly-state state)))
+
+(defun wgrep-prepare-context ()
+  (save-restriction
+    (let ((start (wgrep-goto-first-found))
+          (end (wgrep-goto-end-of-found)))
+      (narrow-to-region start end)
+      (goto-char (point-min))
+      (funcall wgrep-results-parser))))
+
+;; -A -B -C output may be misunderstood and set read-only.
+;; Context match break font-lock if context have at least two `:'.
+;; e.g.
+;; filename-1-2010-01-01 23:59:99
+;; filename:2:hoge
+;; filename-3-20:10:25
+(defun wgrep-prepare-context-while (filename line direction fprop flen)
+  (let* ((next (+ direction line))
+         (fregexp (regexp-quote filename)))
+    (forward-line direction)
+    (while (looking-at (format "^%s[-\0]%d-" fregexp next))
+      (let ((start (match-beginning 0))
+            (end (match-end 0))
+            (bol (line-beginning-position))
+            (eol (line-end-position)))
+        (put-text-property start end 'wgrep-line-filename filename)
+        (put-text-property start end 'wgrep-line-number next)
+        (put-text-property start (+ start flen) fprop filename)
+        (remove-text-properties bol eol '(wgrep-ignore))
+        (forward-line direction)
+        (setq next (+ direction next))))))
+
+(defun wgrep-parse-command-results ()
+  (let ((cache (make-hash-table)))
+    (while (not (eobp))
+      (cond
+       ((looking-at wgrep-line-file-regexp)
+        (let* ((fn (match-string-no-properties 1))
+               (line (string-to-number (match-string 3)))
+               (start (match-beginning 0))
+               (end (match-end 0))
+               (fstart (match-beginning 1))
+               (fend (match-end 1))
+               (lstart (match-beginning 3))
+               (lend (match-end 3))
+               (fprop (wgrep-construct-filename-property fn))
+               (flen (length fn)))
+          ;; check relative path grep result
+          ;; grep result may be --context result with number between 2 colon.
+          ;; ./filename-1-:10:
+          ;; that make misunderstand font-locking
+          ;; check file existence decrease risk of the misunderstanding.
+          (when (or (gethash fn cache nil)
+                    (and (file-exists-p fn)
+                         (puthash fn t cache)))
+            (put-text-property start end 'wgrep-line-filename fn)
+            (put-text-property start end 'wgrep-line-number line)
+            (put-text-property start (+ start flen) fprop fn)
+            ;; handle backward and forward following options.
+            ;; -A (--after-context) -B (--before-context) -C (--context)
+            (save-excursion
+              (wgrep-prepare-context-while fn line -1 fprop flen))
+            (wgrep-prepare-context-while fn line 1 fprop flen)
+            ;; end of context output `--'.
+            (forward-line -1))))
+       (t
+        ;; Add property but this may be removed by `wgrep-prepare-context-while'
+        (put-text-property
+         (line-beginning-position) (line-end-position)
+         'wgrep-ignore t)))
+      (forward-line 1))))
+
+(defun wgrep-restore-from-temp-buffer ()
+  (cond
+   ((and wgrep-sibling-buffer
+         (buffer-live-p wgrep-sibling-buffer))
+    (let ((grepbuf (current-buffer))
+          (tmpbuf wgrep-sibling-buffer)
+          (header (wgrep-current-file-and-linum))
+          (savedc (current-column))
+          (savedp (point))
+          (inhibit-read-only t)
+          (wgrep-inhibit-modification-hook t)
+          buffer-read-only)
+      (erase-buffer)
+      (with-current-buffer tmpbuf
+        (append-to-buffer grepbuf (point-min) (point-max)))
+      (goto-char (point-min))
+      ;; restore previous cursor
+      (or (and header
+               (apply 'wgrep-goto-grep-line header)
+               (move-to-column savedc))
+          (goto-char (min (point-max) savedp)))
+      (wgrep-cleanup-temp-buffer)))
+   (t
+    ;; non fatal error
+    (message "Error! Saved buffer is unavailable."))))
+
+(defun wgrep-prepare-to-edit ()
+  (unless wgrep-prepared
+    (save-excursion
+      (let ((inhibit-read-only t)
+            (wgrep-inhibit-modification-hook t)
+            buffer-read-only)
+        (funcall wgrep-header/footer-parser)
+        (wgrep-prepare-context)
+        (setq wgrep-prepared t)))))
+
+(defun wgrep-prepare-header/footer ()
+  (let (beg end)
+    ;; Set read-only grep result header
+    (goto-char (point-min))
+    (setq beg (point-min))
+    ;; See `compilation-start'
+    (forward-line 4)
+    (setq end (point))
+    (put-text-property beg end 'read-only t)
+    (put-text-property beg end 'wgrep-header t)
+    ;; Set read-only grep result footer
+    (goto-char (point-max))
+    (forward-line -1)
+    (when (re-search-backward "^$" end t)
+      (setq beg (point))
+      (setq end (point-max))
+      (when beg
+        (put-text-property beg end 'read-only t)
+        (put-text-property beg end 'wgrep-footer t)))))
+
+(defun wgrep-set-header/footer-read-only (state)
+  (let ((inhibit-read-only t)
+        (wgrep-inhibit-modification-hook t))
+    ;; header
+    (let ((header-end (next-single-property-change (point-min) 'wgrep-header)))
+      (when header-end
+        (put-text-property (point-min) header-end 'read-only state)))
+    ;; footer
+    (let ((footer-beg (next-single-property-change (point-min) 'wgrep-footer)))
+      (when footer-beg
+        (put-text-property footer-beg (point-max) 'read-only state)))))
+
+
+;;;
+;;; Editing handlers
+;;;
+
+(defun wgrep-after-change-function (beg end leng-before)
+  (cond
+   (wgrep-inhibit-modification-hook nil)
+   ((= (point-min) (point-max))
+    ;; cleanup when first executing
+    (wgrep-cleanup-overlays (point-min) (point-max)))
+   (t
+    (wgrep-put-change-face beg end))))
+
+(defun wgrep-put-change-face (beg end)
+  (save-excursion
+    ;; `looking-at' may destroy match data while replace by regexp.
+    (save-match-data
+      (let ((ov (wgrep-editing-overlay beg end)))
+        ;; delete overlay if text is same as old value.
+        (cond
+         ;; not a valid point
+         ((null ov))
+         ((string= (overlay-get ov 'wgrep-old-text)
+                   (overlay-get ov 'wgrep-edit-text))
+          ;; back to unchanged
+          (delete-overlay ov))
+         (t
+          (overlay-put ov 'face 'wgrep-face)))))))
+
+;;;
+;;; Save grep buffer to file buffer/disk
+;;;
+
+(defun wgrep-set-result (ov face &optional message)
+  (overlay-put ov 'face face)
+  (overlay-put ov 'priority 1)
+  (overlay-put ov 'wgrep-reject-message message))
+
+(defun wgrep-put-done-result (ov)
+  (wgrep-set-result ov 'wgrep-done-face))
+
+(defun wgrep-put-reject-result (ov error-data)
+  (let ((message (mapconcat (lambda (x) (format "%s" x)) error-data " ")))
+    (wgrep-set-result ov 'wgrep-reject-face message)))
+
+(defun wgrep-put-overlay-to-file-buffer (beg end)
+  "*Highlight the changes in the file"
+  (let ((ov
+         (catch 'done
+           (dolist (o (overlays-in beg end))
+             (when (overlay-get o 'wgrep)
+               (move-overlay o beg end)
+               (throw 'done o)))
+           (wgrep-make-overlay beg end))))
+    (overlay-put ov 'face 'wgrep-file-face)
+    (overlay-put ov 'priority 0)
+    (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)
+    ov))
+
+(defun wgrep-replace-to-new-line (new-text)
+  ;; delete grep extracted region (restricted to a line)
+  (delete-region (line-beginning-position) (line-end-position))
+  (let ((beg (point))
+        end)
+    (insert new-text)
+    (let* ((end (point))
+           ;; hilight the changed line
+           (ov (wgrep-put-overlay-to-file-buffer beg end)))
+      ;; make overlay volatile.
+      (wgrep-let-destructive-overlay ov))))
+
+(defun wgrep-flush-whole-line ()
+  (wgrep-put-overlay-to-file-buffer
+   (line-beginning-position) (line-end-position))
+  (wgrep-delete-whole-line))
 
 ;; EDITOR ::= FILE (absolute-path) . EDIT
 ;; EDIT ::= linum old-text new-text result-overlay edit-overlay

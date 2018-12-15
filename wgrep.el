@@ -271,15 +271,6 @@ End of this match equals start of file contents.
     (signal 'wgrep-error
             (list (format "Buffer \"%s\" is read-only." (buffer-name))))))
 
-(defun wgrep-display-physical-data ()
-  (cond
-   ;; `funcall' is a trick to suppress the elint warnings.
-   ((derived-mode-p 'image-mode)
-    ;; toggle to raw data if buffer has image.
-    (when (image-get-display-property)
-      (image-mode-as-text)))
-   (t nil)))
-
 (defun wgrep-let-destructive-overlay (ov)
   (dolist (prop '(modification-hooks insert-in-front-hooks insert-behind-hooks))
     (overlay-put
@@ -326,58 +317,6 @@ End of this match equals start of file contents.
         (setq res (cons ov res))))
     (nreverse res)))
 
-;; get overlay BEG and END is passed by `after-change-functions'
-(defun wgrep-editing-overlay (&optional start end)
-  (let ((beg (or start (line-beginning-position)))
-        (fin (or end (line-end-position)))
-        ov bol eol
-        ;; beginning/end of grep
-        bog eog)
-    (goto-char beg)
-    (setq bol (line-beginning-position))
-    (goto-char fin)
-    (setq eol (line-end-position))
-    (catch 'done
-      (dolist (o (overlays-in bol eol))
-        ;; find overlay that have changed by user.
-        (when (overlay-get o 'wgrep-changed)
-          (setq ov o)
-          (throw 'done o))))
-    (if ov
-        (setq bog (min beg (overlay-start ov))
-              eog (max (overlay-end ov) fin))
-      (setq bog bol
-            eog eol))
-    (goto-char bog)
-    (cond
-     ;; When handling whole line, BOL equal beginning of edit.
-     ((and (null ov) start (= bog start)))
-     ((get-text-property (point) 'wgrep-line-filename)
-      (let* ((header-end
-              (next-single-property-change (point) 'wgrep-line-filename nil eol))
-             (filename (get-text-property (point) 'wgrep-line-filename))
-             (linum (get-text-property (point) 'wgrep-line-number))
-             (value (buffer-substring-no-properties header-end eog))
-             contents-begin)
-        (goto-char header-end)
-        (setq contents-begin (point-marker))
-        ;; create editing overlay
-        (cond
-         ((null ov)
-          (let ((old (wgrep-get-old-text filename linum)))
-            (setq ov (wgrep-make-overlay bog eog))
-            (overlay-put ov 'wgrep-contents-begin contents-begin)
-            (overlay-put ov 'wgrep-filename filename)
-            (overlay-put ov 'wgrep-linum linum)
-            (overlay-put ov 'wgrep-changed t)
-            (overlay-put ov 'priority 0)
-            (overlay-put ov 'evaporate t)
-            (overlay-put ov 'wgrep-old-text old)))
-         (t
-          (move-overlay ov bog eog)))
-        (overlay-put ov 'wgrep-edit-text value))))
-    ov))
-
 (defun wgrep-to-original-mode ()
   (kill-local-variable 'query-replace-skip-read-only)
   (remove-hook 'after-change-functions 'wgrep-after-change-function t)
@@ -390,26 +329,6 @@ End of this match equals start of file contents.
 
 (defun wgrep-delete-whole-line ()
   (delete-region (line-beginning-position) (line-beginning-position 2)))
-
-(defun wgrep-goto-first-found ()
-  (let ((header (previous-single-property-change (point-max) 'wgrep-header)))
-    (cond
-     (header
-      (goto-char header)
-      header)
-     (t
-      (goto-char (point-min))
-      (point)))))
-
-(defun wgrep-goto-end-of-found ()
-  (let ((footer (next-single-property-change (point-min) 'wgrep-footer)))
-    (cond
-     (footer
-      (goto-char footer)
-      footer)
-     (t
-      (goto-char (point-max))
-      (point-max)))))
 
 (defun wgrep-goto-line (line)
   (goto-char (point-min))
@@ -432,26 +351,6 @@ End of this match equals start of file contents.
   (let ((o (make-overlay beg end nil nil t)))
     (overlay-put o 'wgrep t)
     o))
-
-(defun wgrep-clone-to-temp-buffer ()
-  (wgrep-cleanup-temp-buffer)
-  (let ((grepbuf (current-buffer))
-        (tmpbuf (generate-new-buffer " *wgrep temp* ")))
-    (setq wgrep-sibling-buffer tmpbuf)
-    (add-hook 'kill-buffer-hook 'wgrep-cleanup-temp-buffer nil t)
-    (append-to-buffer tmpbuf (point-min) (point-max))
-    (with-current-buffer tmpbuf
-      (setq wgrep-sibling-buffer grepbuf))
-    tmpbuf))
-
-(defun wgrep-cleanup-temp-buffer ()
-  "Cleanup temp buffer in *grep* buffer."
-  (let ((origin-buffer (current-buffer)))
-    (dolist (buf (buffer-list))
-      (with-current-buffer buf
-        (when (eq origin-buffer wgrep-sibling-buffer)
-          (kill-buffer buf)))))
-  (setq wgrep-sibling-buffer nil))
 
 (defun wgrep-current-file-and-linum ()
   (save-excursion
@@ -501,8 +400,48 @@ End of this match equals start of file contents.
       nil)))
 
 ;;;
-;;; Prepare grep <-> wgrep
+;;; Prepare and parse grep <-> wgrep
 ;;;
+
+(defun wgrep-goto-first-found ()
+  (let ((header (previous-single-property-change (point-max) 'wgrep-header)))
+    (cond
+     (header
+      (goto-char header)
+      header)
+     (t
+      (goto-char (point-min))
+      (point)))))
+
+(defun wgrep-goto-end-of-found ()
+  (let ((footer (next-single-property-change (point-min) 'wgrep-footer)))
+    (cond
+     (footer
+      (goto-char footer)
+      footer)
+     (t
+      (goto-char (point-max))
+      (point-max)))))
+
+(defun wgrep-cleanup-temp-buffer ()
+  "Cleanup temp buffer in *grep* buffer."
+  (let ((origin-buffer (current-buffer)))
+    (dolist (buf (buffer-list))
+      (with-current-buffer buf
+        (when (eq origin-buffer wgrep-sibling-buffer)
+          (kill-buffer buf)))))
+  (setq wgrep-sibling-buffer nil))
+
+(defun wgrep-clone-to-temp-buffer ()
+  (wgrep-cleanup-temp-buffer)
+  (let ((grepbuf (current-buffer))
+        (tmpbuf (generate-new-buffer " *wgrep temp* ")))
+    (setq wgrep-sibling-buffer tmpbuf)
+    (add-hook 'kill-buffer-hook 'wgrep-cleanup-temp-buffer nil t)
+    (append-to-buffer tmpbuf (point-min) (point-max))
+    (with-current-buffer tmpbuf
+      (setq wgrep-sibling-buffer grepbuf))
+    tmpbuf))
 
 (defun wgrep-set-readonly-area (state)
   (let ((inhibit-read-only t)
@@ -682,6 +621,58 @@ End of this match equals start of file contents.
 ;;; Editing handlers
 ;;;
 
+;; get overlay BEG and END is passed by `after-change-functions'
+(defun wgrep-editing-overlay (&optional start end)
+  (let ((beg (or start (line-beginning-position)))
+        (fin (or end (line-end-position)))
+        ov bol eol
+        ;; beginning/end of grep
+        bog eog)
+    (goto-char beg)
+    (setq bol (line-beginning-position))
+    (goto-char fin)
+    (setq eol (line-end-position))
+    (catch 'done
+      (dolist (o (overlays-in bol eol))
+        ;; find overlay that have changed by user.
+        (when (overlay-get o 'wgrep-changed)
+          (setq ov o)
+          (throw 'done o))))
+    (if ov
+        (setq bog (min beg (overlay-start ov))
+              eog (max (overlay-end ov) fin))
+      (setq bog bol
+            eog eol))
+    (goto-char bog)
+    (cond
+     ;; When handling whole line, BOL equal beginning of edit.
+     ((and (null ov) start (= bog start)))
+     ((get-text-property (point) 'wgrep-line-filename)
+      (let* ((header-end
+              (next-single-property-change (point) 'wgrep-line-filename nil eol))
+             (filename (get-text-property (point) 'wgrep-line-filename))
+             (linum (get-text-property (point) 'wgrep-line-number))
+             (value (buffer-substring-no-properties header-end eog))
+             contents-begin)
+        (goto-char header-end)
+        (setq contents-begin (point-marker))
+        ;; create editing overlay
+        (cond
+         ((null ov)
+          (let ((old (wgrep-get-old-text filename linum)))
+            (setq ov (wgrep-make-overlay bog eog))
+            (overlay-put ov 'wgrep-contents-begin contents-begin)
+            (overlay-put ov 'wgrep-filename filename)
+            (overlay-put ov 'wgrep-linum linum)
+            (overlay-put ov 'wgrep-changed t)
+            (overlay-put ov 'priority 0)
+            (overlay-put ov 'evaporate t)
+            (overlay-put ov 'wgrep-old-text old)))
+         (t
+          (move-overlay ov bog eog)))
+        (overlay-put ov 'wgrep-edit-text value))))
+    ov))
+
 (defun wgrep-after-change-function (beg end leng-before)
   (cond
    (wgrep-inhibit-modification-hook nil)
@@ -710,6 +701,15 @@ End of this match equals start of file contents.
 ;;;
 ;;; Save grep buffer to file buffer/disk
 ;;;
+
+(defun wgrep-display-physical-data ()
+  (cond
+   ;; `funcall' is a trick to suppress the elint warnings.
+   ((derived-mode-p 'image-mode)
+    ;; toggle to raw data if buffer has image.
+    (when (image-get-display-property)
+      (image-mode-as-text)))
+   (t nil)))
 
 (defun wgrep-set-result (ov face &optional message)
   (overlay-put ov 'face face)

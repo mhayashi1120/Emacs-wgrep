@@ -117,67 +117,6 @@ Key to enable `wgrep-mode'."
 (defvar wgrep-setup-hook nil
   "Hooks to run when setting up wgrep.")
 
-(defface wgrep-face
-  '((((class color)
-      (background dark))
-     (:background "SlateGray1" :foreground "Black"))
-    (((class color)
-      (background light))
-     (:background "ForestGreen" :foreground "white"))
-    (t
-     ()))
-  "*Face used for the changed text in the grep buffer."
-  :group 'wgrep)
-
-(defface wgrep-delete-face
-  '((((class color)
-      (background dark))
-     (:background "SlateGray1" :foreground "pink"))
-    (((class color)
-      (background light))
-     (:background "ForestGreen" :foreground "pink"))
-    (t
-     ()))
-  "*Face used for the deleted whole line in the grep buffer."
-  :group 'wgrep)
-
-(defface wgrep-file-face
-  '((((class color)
-      (background dark))
-     (:background "gray30" :foreground "white"))
-    (((class color)
-      (background light))
-     (:background "ForestGreen" :foreground "white"))
-    (t
-     ()))
-  "*Face used for the changed text in the file buffer."
-  :group 'wgrep)
-
-(defface wgrep-reject-face
-  '((((class color)
-      (background dark))
-     (:foreground "HotPink" :weight bold))
-    (((class color)
-      (background light))
-     (:foreground "Red" :weight bold))
-    (t
-     ()))
-  "*Face used for the line in the grep buffer that can not be applied to
-a file."
-  :group 'wgrep)
-
-(defface wgrep-done-face
-  '((((class color)
-      (background dark))
-     (:foreground "LightSkyBlue"))
-    (((class color)
-      (background light))
-     (:foreground "Blue"))
-    (t
-     ()))
-  "*Face used for the line in the grep buffer that can be applied to a file."
-  :group 'wgrep)
-
 (defvar wgrep-readonly-state nil)
 (make-variable-buffer-local 'wgrep-readonly-state)
 
@@ -235,122 +174,8 @@ End of this match equals start of file contents.
 
 (defvar wgrep-mode-map nil)
 
-(defun wgrep-setup-internal ()
-  (setq wgrep-original-mode-map (current-local-map))
-  (define-key wgrep-original-mode-map
-    wgrep-enable-key 'wgrep-change-to-wgrep-mode)
-  ;; delete previous wgrep overlays
-  (wgrep-cleanup-overlays (point-min) (point-max))
-  (remove-hook 'post-command-hook 'wgrep-maybe-echo-error-at-point t)
-  (run-hooks 'wgrep-setup-hook))
-
-(defun wgrep-maybe-echo-error-at-point ()
-  (when (null (current-message))
-    (let ((ov (catch 'found
-                (dolist (o (overlays-in
-                            (line-beginning-position) (line-end-position)))
-                  (when (overlay-get o 'wgrep-reject-message)
-                    (throw 'found o))))))
-      (when ov
-        (let (message-log-max)
-          (message "%s" (overlay-get ov 'wgrep-reject-message)))))))
-
 (put 'wgrep-error 'error-conditions '(wgrep-error error))
 (put 'wgrep-error 'error-message "wgrep error")
-
-(defun wgrep-check-file (file)
-  (unless (file-exists-p file)
-    (signal 'wgrep-error (list "File does not exist.")))
-  (unless (file-writable-p file)
-    (signal 'wgrep-error (list "File is not writable."))))
-
-(defun wgrep-check-buffer ()
-  "Check the file's status. If it is possible to change the file, return t"
-  (when (and (not wgrep-change-readonly-file)
-             buffer-read-only)
-    (signal 'wgrep-error
-            (list (format "Buffer \"%s\" is read-only." (buffer-name))))))
-
-(defun wgrep-let-destructive-overlay (ov)
-  (dolist (prop '(modification-hooks insert-in-front-hooks insert-behind-hooks))
-    (overlay-put
-     ov prop
-     `((lambda (ov after-p &rest ignore)
-         (when after-p
-           (delete-overlay ov)))))))
-
-(defun wgrep-after-save-hook ()
-  (remove-hook 'after-save-hook 'wgrep-after-save-hook t)
-  (dolist (ov (wgrep-file-overlays))
-    (delete-overlay ov)))
-
-(defun wgrep-file-overlays ()
-  (save-restriction
-    (widen)
-    (let (res)
-      (dolist (ov (overlays-in (point-min) (point-max)))
-        (when (overlay-get ov 'wgrep)
-          (setq res (cons ov res))))
-      (nreverse res))))
-
-;;Hack function
-(defun wgrep-string-replace-bom (string cs)
-  (let ((regexp (car (rassq (coding-system-base cs) auto-coding-regexp-alist)))
-        ;;TODO check ack-grep
-        ;; FIXME: `find-operation-coding-system' is not exactly correct.
-        ;;        However almost case is ok like this bom function.
-        ;;        e.g. (let ((default-process-coding-system 'some-coding))
-        ;;               (call-interactively 'grep))
-        (grep-cs (or (find-operation-coding-system 'call-process grep-program)
-                     (terminal-coding-system)))
-        str)
-    (if (and regexp
-             (setq str (encode-coding-string string grep-cs))
-             (string-match regexp str))
-        (decode-coding-string (substring str (match-end 0)) cs)
-      string)))
-
-(defun wgrep-edit-overlays ()
-  (let (res)
-    (dolist (ov (overlays-in (point-min) (point-max)))
-      (when (overlay-get ov 'wgrep-changed)
-        (setq res (cons ov res))))
-    (nreverse res)))
-
-(defun wgrep-to-original-mode ()
-  (kill-local-variable 'query-replace-skip-read-only)
-  (remove-hook 'after-change-functions 'wgrep-after-change-function t)
-  ;; do not remove `wgrep-maybe-echo-error-at-point' that display
-  ;; errors at point
-  (use-local-map wgrep-original-mode-map)
-  (set-buffer-modified-p nil)
-  (setq buffer-undo-list nil)
-  (setq buffer-read-only t))
-
-(defun wgrep-delete-whole-line ()
-  (delete-region (line-beginning-position) (line-beginning-position 2)))
-
-(defun wgrep-goto-line (line)
-  (goto-char (point-min))
-  (forward-line (1- line)))
-
-(defun wgrep-construct-filename-property (filename)
-  (intern (format "wgrep-fn-%s" filename)))
-
-(defun wgrep-process-exited-p ()
-  (let ((proc (get-buffer-process (current-buffer))))
-    (or (null proc)
-        (eq (process-status proc) 'exit))))
-
-(defun wgrep-cleanup-overlays (beg end)
-  (dolist (ov (overlays-in beg end))
-    (when (overlay-get ov 'wgrep)
-      (delete-overlay ov))))
-
-(defun wgrep-make-overlay (beg end)
-  (let ((o (make-overlay beg end nil nil t)))
-    (overlay-put o 'wgrep t)
-    o))
 
 (defun wgrep-current-file-and-linum ()
   (save-excursion
@@ -360,13 +185,8 @@ End of this match equals start of file contents.
       (when (and fn linum)
         (list fn linum)))))
 
-(defun wgrep-get-old-text (file number)
-  (when (and wgrep-sibling-buffer
-             (buffer-live-p wgrep-sibling-buffer))
-    (with-current-buffer wgrep-sibling-buffer
-      (when (wgrep-goto-grep-line file number)
-        (buffer-substring-no-properties
-         (point) (line-end-position))))))
+(defun wgrep-construct-filename-property (filename)
+  (intern (format "wgrep-fn-%s" filename)))
 
 (defun wgrep-goto-grep-line (file number)
   (let ((first (point))
@@ -400,8 +220,102 @@ End of this match equals start of file contents.
       nil)))
 
 ;;;
+;;; Basic utilities
+;;;
+
+;;
+;; misc
+;;
+
+;;Hack function
+(defun wgrep-string-replace-bom (string cs)
+  (let ((regexp (car (rassq (coding-system-base cs) auto-coding-regexp-alist)))
+        ;;TODO check ack-grep
+        ;; FIXME: `find-operation-coding-system' is not exactly correct.
+        ;;        However almost case is ok like this bom function.
+        ;;        e.g. (let ((default-process-coding-system 'some-coding))
+        ;;               (call-interactively 'grep))
+        (grep-cs (or (find-operation-coding-system 'call-process grep-program)
+                     (terminal-coding-system)))
+        str)
+    (if (and regexp
+             (setq str (encode-coding-string string grep-cs))
+             (string-match regexp str))
+        (decode-coding-string (substring str (match-end 0)) cs)
+      string)))
+
+(defun wgrep-delete-whole-line ()
+  (delete-region (line-beginning-position) (line-beginning-position 2)))
+
+(defun wgrep-goto-line (line)
+  (goto-char (point-min))
+  (forward-line (1- line)))
+
+(defun wgrep-process-exited-p ()
+  (let ((proc (get-buffer-process (current-buffer))))
+    (or (null proc)
+        (eq (process-status proc) 'exit))))
+
+;;
+;; error
+;;
+
+(defun wgrep-check-file (file)
+  (unless (file-exists-p file)
+    (signal 'wgrep-error (list "File does not exist.")))
+  (unless (file-writable-p file)
+    (signal 'wgrep-error (list "File is not writable."))))
+
+(defun wgrep-check-buffer ()
+  "Check the file's status. If it is possible to change the file, return t"
+  (when (and (not wgrep-change-readonly-file)
+             buffer-read-only)
+    (signal 'wgrep-error
+            (list (format "Buffer \"%s\" is read-only." (buffer-name))))))
+
+;;
+;; overlay
+;;
+
+(defun wgrep-cleanup-overlays (beg end)
+  (dolist (ov (overlays-in beg end))
+    (when (overlay-get ov 'wgrep)
+      (delete-overlay ov))))
+
+(defun wgrep-make-overlay (beg end)
+  (let ((o (make-overlay beg end nil nil t)))
+    (overlay-put o 'wgrep t)
+    o))
+
+(defun wgrep-file-overlays ()
+  (save-restriction
+    (widen)
+    (let (res)
+      (dolist (ov (overlays-in (point-min) (point-max)))
+        (when (overlay-get ov 'wgrep)
+          (setq res (cons ov res))))
+      (nreverse res))))
+
+(defun wgrep-edit-overlays ()
+  (let (res)
+    (dolist (ov (overlays-in (point-min) (point-max)))
+      (when (overlay-get ov 'wgrep-changed)
+        (setq res (cons ov res))))
+    (nreverse res)))
+
+;;;
 ;;; Prepare and parse grep <-> wgrep
 ;;;
+
+(defun wgrep-to-original-mode ()
+  (kill-local-variable 'query-replace-skip-read-only)
+  (remove-hook 'after-change-functions 'wgrep-after-change-function t)
+  ;; do not remove `wgrep-maybe-echo-error-at-point' that display
+  ;; errors at point
+  (use-local-map wgrep-original-mode-map)
+  (set-buffer-modified-p nil)
+  (setq buffer-undo-list nil)
+  (setq buffer-read-only t))
 
 (defun wgrep-goto-first-found ()
   (let ((header (previous-single-property-change (point-max) 'wgrep-header)))
@@ -621,6 +535,14 @@ End of this match equals start of file contents.
 ;;; Editing handlers
 ;;;
 
+(defun wgrep-get-old-text (file number)
+  (when (and wgrep-sibling-buffer
+             (buffer-live-p wgrep-sibling-buffer))
+    (with-current-buffer wgrep-sibling-buffer
+      (when (wgrep-goto-grep-line file number)
+        (buffer-substring-no-properties
+         (point) (line-end-position))))))
+
 ;; get overlay BEG and END is passed by `after-change-functions'
 (defun wgrep-editing-overlay (&optional start end)
   (let ((beg (or start (line-beginning-position)))
@@ -723,6 +645,11 @@ End of this match equals start of file contents.
   (let ((message (mapconcat (lambda (x) (format "%s" x)) error-data " ")))
     (wgrep-set-result ov 'wgrep-reject-face message)))
 
+(defun wgrep-after-save-hook ()
+  (remove-hook 'after-save-hook 'wgrep-after-save-hook t)
+  (dolist (ov (wgrep-file-overlays))
+    (delete-overlay ov)))
+
 (defun wgrep-put-overlay-to-file-buffer (beg end)
   "*Highlight the changes in the file"
   (let ((ov
@@ -736,6 +663,14 @@ End of this match equals start of file contents.
     (overlay-put ov 'priority 0)
     (add-hook 'after-save-hook 'wgrep-after-save-hook nil t)
     ov))
+
+(defun wgrep-let-destructive-overlay (ov)
+  (dolist (prop '(modification-hooks insert-in-front-hooks insert-behind-hooks))
+    (overlay-put
+     ov prop
+     `((lambda (ov after-p &rest ignore)
+         (when after-p
+           (delete-overlay ov)))))))
 
 (defun wgrep-replace-to-new-line (new-text)
   ;; delete grep extracted region (restricted to a line)
@@ -905,6 +840,82 @@ NEW may be nil this means deleting whole line."
      (t
       ;; new nil means flush whole line.
       (wgrep-flush-whole-line)))))
+
+;;;
+;;; UI
+;;;
+
+(defface wgrep-face
+  '((((class color)
+      (background dark))
+     (:background "SlateGray1" :foreground "Black"))
+    (((class color)
+      (background light))
+     (:background "ForestGreen" :foreground "white"))
+    (t
+     ()))
+  "*Face used for the changed text in the grep buffer."
+  :group 'wgrep)
+
+(defface wgrep-delete-face
+  '((((class color)
+      (background dark))
+     (:background "SlateGray1" :foreground "pink"))
+    (((class color)
+      (background light))
+     (:background "ForestGreen" :foreground "pink"))
+    (t
+     ()))
+  "*Face used for the deleted whole line in the grep buffer."
+  :group 'wgrep)
+
+(defface wgrep-file-face
+  '((((class color)
+      (background dark))
+     (:background "gray30" :foreground "white"))
+    (((class color)
+      (background light))
+     (:background "ForestGreen" :foreground "white"))
+    (t
+     ()))
+  "*Face used for the changed text in the file buffer."
+  :group 'wgrep)
+
+(defface wgrep-reject-face
+  '((((class color)
+      (background dark))
+     (:foreground "HotPink" :weight bold))
+    (((class color)
+      (background light))
+     (:foreground "Red" :weight bold))
+    (t
+     ()))
+  "*Face used for the line in the grep buffer that can not be applied to
+a file."
+  :group 'wgrep)
+
+(defface wgrep-done-face
+  '((((class color)
+      (background dark))
+     (:foreground "LightSkyBlue"))
+    (((class color)
+      (background light))
+     (:foreground "Blue"))
+    (t
+     ()))
+  "*Face used for the line in the grep buffer that can be applied to a file."
+  :group 'wgrep)
+
+(defun wgrep-maybe-echo-error-at-point ()
+  (when (null (current-message))
+    (let ((ov (catch 'found
+                (dolist (o (overlays-in
+                            (line-beginning-position) (line-end-position)))
+                  (when (overlay-get o 'wgrep-reject-message)
+                    (throw 'found o))))))
+      (when ov
+        (let (message-log-max)
+          (message "%s" (overlay-get ov 'wgrep-reject-message)))))))
 
 ;;;
 ;;; Commands
@@ -1091,6 +1102,15 @@ This change will be applied when \\[wgrep-finish-edit]."
 ;;;
 ;;; Entry point
 ;;;
+
+(defun wgrep-setup-internal ()
+  (setq wgrep-original-mode-map (current-local-map))
+  (define-key wgrep-original-mode-map
+    wgrep-enable-key 'wgrep-change-to-wgrep-mode)
+  ;; delete previous wgrep overlays
+  (wgrep-cleanup-overlays (point-min) (point-max))
+  (remove-hook 'post-command-hook 'wgrep-maybe-echo-error-at-point t)
+  (run-hooks 'wgrep-setup-hook))
 
 ;;;###autoload
 (defun wgrep-setup ()

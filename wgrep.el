@@ -177,48 +177,6 @@ End of this match equals start of file contents.
 (put 'wgrep-error 'error-conditions '(wgrep-error error))
 (put 'wgrep-error 'error-message "wgrep error")
 
-(defun wgrep-current-file-and-linum ()
-  (save-excursion
-    (forward-line 0)
-    (let ((fn (get-text-property (point) 'wgrep-line-filename))
-          (linum (get-text-property (point) 'wgrep-line-number)))
-      (when (and fn linum)
-        (list fn linum)))))
-
-(defun wgrep-construct-filename-property (filename)
-  (intern (format "wgrep-fn-%s" filename)))
-
-(defun wgrep-goto-grep-line (file number)
-  (let ((first (point))
-        (fprop (wgrep-construct-filename-property file))
-        fn next)
-    (catch 'found
-      ;; FIXME
-      ;; In a huge buffer, `next-single-property-change' loop make
-      ;; slow down the program.
-      ;; 1. sketchy move by filename (wgrep-fn-* property).
-      ;; 2. search filename and line-number in text property.
-      ;; 3. return to 1. while search is done or EOB.
-
-      (goto-char (point-min))
-
-      (while (setq next (next-single-property-change (point) fprop))
-        (goto-char next)
-        (while (and (not (eobp))
-                    (or (null (setq fn (get-text-property
-                                        (line-beginning-position)
-                                        'wgrep-line-filename)))
-                        (string= fn file)))
-          (when fn
-            (let ((num (get-text-property (point) 'wgrep-line-number))
-                  (start (next-single-property-change (point) 'wgrep-line-number)))
-              (when (eq number num)
-                (goto-char start)
-                (throw 'found t))))
-          (forward-line 1)))
-      (goto-char first)
-      nil)))
-
 ;;;
 ;;; Basic utilities
 ;;;
@@ -302,6 +260,52 @@ End of this match equals start of file contents.
       (when (overlay-get ov 'wgrep-changed)
         (setq res (cons ov res))))
     (nreverse res)))
+
+;;;
+;;; grep result handler
+;;;
+
+(defun wgrep-construct-filename-property (filename)
+  (intern (format "wgrep-fn-%s" filename)))
+
+(defun wgrep-goto-grep-line (file number)
+  (let ((first (point))
+        (fprop (wgrep-construct-filename-property file))
+        fn next)
+    (catch 'found
+      ;; FIXME
+      ;; In a huge buffer, `next-single-property-change' loop make
+      ;; slow down the program.
+      ;; 1. sketchy move by filename (wgrep-fn-* property).
+      ;; 2. search filename and line-number in text property.
+      ;; 3. return to 1. while search is done or EOB.
+
+      (goto-char (point-min))
+
+      (while (setq next (next-single-property-change (point) fprop))
+        (goto-char next)
+        (while (and (not (eobp))
+                    (or (null (setq fn (get-text-property
+                                        (line-beginning-position)
+                                        'wgrep-line-filename)))
+                        (string= fn file)))
+          (when fn
+            (let ((num (get-text-property (point) 'wgrep-line-number))
+                  (start (next-single-property-change (point) 'wgrep-line-number)))
+              (when (eq number num)
+                (goto-char start)
+                (throw 'found t))))
+          (forward-line 1)))
+      (goto-char first)
+      nil)))
+
+(defun wgrep-get-old-text (file number)
+  (when (and wgrep-sibling-buffer
+             (buffer-live-p wgrep-sibling-buffer))
+    (with-current-buffer wgrep-sibling-buffer
+      (when (wgrep-goto-grep-line file number)
+        (buffer-substring-no-properties
+         (point) (line-end-position))))))
 
 ;;;
 ;;; Prepare and parse grep <-> wgrep
@@ -462,6 +466,14 @@ End of this match equals start of file contents.
          'wgrep-ignore t)))
       (forward-line 1))))
 
+(defun wgrep-current-file-and-linum ()
+  (save-excursion
+    (forward-line 0)
+    (let ((fn (get-text-property (point) 'wgrep-line-filename))
+          (linum (get-text-property (point) 'wgrep-line-number)))
+      (when (and fn linum)
+        (list fn linum)))))
+
 (defun wgrep-restore-from-temp-buffer ()
   (cond
    ((and wgrep-sibling-buffer
@@ -530,18 +542,9 @@ End of this match equals start of file contents.
       (when footer-beg
         (put-text-property footer-beg (point-max) 'read-only state)))))
 
-
 ;;;
 ;;; Editing handlers
 ;;;
-
-(defun wgrep-get-old-text (file number)
-  (when (and wgrep-sibling-buffer
-             (buffer-live-p wgrep-sibling-buffer))
-    (with-current-buffer wgrep-sibling-buffer
-      (when (wgrep-goto-grep-line file number)
-        (buffer-substring-no-properties
-         (point) (line-end-position))))))
 
 ;; get overlay BEG and END is passed by `after-change-functions'
 (defun wgrep-editing-overlay (&optional start end)

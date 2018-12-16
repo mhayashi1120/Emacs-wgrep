@@ -93,6 +93,14 @@
   :prefix "wgrep-"
   :group 'grep)
 
+;;;
+;;; Variable / Constant
+;;;
+
+;;
+;; Customize
+;;
+
 (defcustom wgrep-change-readonly-file nil
   "Non-nil means to enable change read-only files."
   :group 'wgrep
@@ -117,6 +125,12 @@ Key to enable `wgrep-mode'."
 (defvar wgrep-setup-hook nil
   "Hooks to run when setting up wgrep.")
 
+(defvar wgrep-mode-map nil)
+
+;;
+;; Internal variable
+;;
+
 (defvar wgrep-readonly-state nil)
 (make-variable-buffer-local 'wgrep-readonly-state)
 
@@ -129,15 +143,21 @@ Key to enable `wgrep-mode'."
 (defvar wgrep-original-mode-map nil)
 (make-variable-buffer-local 'wgrep-original-mode-map)
 
-;; Suppress elint warning
-;; GNU Emacs have this variable at least version 21 or later
-(defvar auto-coding-regexp-alist)
+(defvar wgrep-inhibit-modification-hook nil)
+
+(defvar wgrep-auto-apply-disk nil
+  "Internal use `wgrep-auto-save-buffer' or too many file is editing.")
 
 (defvar wgrep-acceptable-modes nil)
 (make-obsolete 'wgrep-acceptable-modes nil "2.1.1")
 
-(defvar wgrep-auto-apply-disk nil
-  "Internal use `wgrep-auto-save-buffer' or too many file is editing.")
+;; Suppress elint warning
+;; GNU Emacs have this variable at least version 21 or later
+(defvar auto-coding-regexp-alist)
+
+;;
+;; Constant
+;;
 
 ;; These regexp come from `grep-regexp-alist' at grep.el
 (eval-and-compile
@@ -161,6 +181,17 @@ Key to enable `wgrep-mode'."
      wgrep-colon-file-separator-header-regexp
      "\\)")))
 
+;;
+;; Error
+;;
+
+(put 'wgrep-error 'error-conditions '(wgrep-error error))
+(put 'wgrep-error 'error-message "wgrep error")
+
+;;
+;; Overwride functions / regexp
+;;
+
 (defvar wgrep-line-file-regexp wgrep-default-line-header-regexp
   "Regexp that match to line header of grep result.
 
@@ -169,13 +200,6 @@ End of this match equals start of file contents.
 ")
 (defvar wgrep-results-parser 'wgrep-parse-command-results)
 (defvar wgrep-header/footer-parser 'wgrep-prepare-header/footer)
-
-(defvar wgrep-inhibit-modification-hook nil)
-
-(defvar wgrep-mode-map nil)
-
-(put 'wgrep-error 'error-conditions '(wgrep-error error))
-(put 'wgrep-error 'error-message "wgrep error")
 
 ;;;
 ;;; Basic utilities

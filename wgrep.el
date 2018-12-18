@@ -227,7 +227,7 @@ End of this match equals start of file contents.
       string)))
 
 (defun wgrep-delete-whole-line ()
-  (delete-region (line-beginning-position) (line-beginning-position 2)))
+  (delete-region (point-at-bol) (point-at-bol 2)))
 
 (defun wgrep-goto-line (line)
   (goto-char (point-min))
@@ -310,7 +310,7 @@ End of this match equals start of file contents.
         (goto-char next)
         (while (and (not (eobp))
                     (or (null (setq fn (get-text-property
-                                        (line-beginning-position)
+                                        (point-at-bol)
                                         'wgrep-line-filename)))
                         (string= fn file)))
           (when fn
@@ -329,7 +329,7 @@ End of this match equals start of file contents.
     (with-current-buffer wgrep-sibling-buffer
       (when (wgrep-goto-grep-line file number)
         (buffer-substring-no-properties
-         (point) (line-end-position))))))
+         (point) (point-at-eol))))))
 
 ;;;
 ;;; Prepare and parse grep <-> wgrep
@@ -441,8 +441,8 @@ End of this match equals start of file contents.
     (while (looking-at (format "^%s[-\0]%d-" fregexp next))
       (let ((start (match-beginning 0))
             (end (match-end 0))
-            (bol (line-beginning-position))
-            (eol (line-end-position)))
+            (bol (point-at-bol))
+            (eol (point-at-eol)))
         (put-text-property start end 'wgrep-line-filename filename)
         (put-text-property start end 'wgrep-line-number next)
         (put-text-property start (+ start flen) fprop filename)
@@ -486,7 +486,7 @@ End of this match equals start of file contents.
        (t
         ;; Add property but this may be removed by `wgrep-prepare-context-while'
         (put-text-property
-         (line-beginning-position) (line-end-position)
+         (point-at-bol) (point-at-eol)
          'wgrep-ignore t)))
       (forward-line 1))))
 
@@ -572,15 +572,15 @@ End of this match equals start of file contents.
 
 ;; get overlay BEG and END is passed by `after-change-functions'
 (defun wgrep-editing-overlay (&optional start end)
-  (let ((beg (or start (line-beginning-position)))
-        (fin (or end (line-end-position)))
+  (let ((beg (or start (point-at-bol)))
+        (fin (or end (point-at-eol)))
         ov bol eol
         ;; beginning/end of grep
         bog eog)
     (goto-char beg)
-    (setq bol (line-beginning-position))
+    (setq bol (point-at-bol))
     (goto-char fin)
-    (setq eol (line-end-position))
+    (setq eol (point-at-eol))
     (catch 'done
       (dolist (o (overlays-in bol eol))
         ;; find overlay that have changed by user.
@@ -701,7 +701,7 @@ End of this match equals start of file contents.
 
 (defun wgrep-replace-to-new-line (new-text)
   ;; delete grep extracted region (restricted to a line)
-  (delete-region (line-beginning-position) (line-end-position))
+  (delete-region (point-at-bol) (point-at-eol))
   (let ((beg (point))
         end)
     (insert new-text)
@@ -713,7 +713,7 @@ End of this match equals start of file contents.
 
 (defun wgrep-flush-whole-line ()
   (wgrep-put-overlay-to-file-buffer
-   (line-beginning-position) (line-end-position))
+   (point-at-bol) (point-at-eol))
   (wgrep-delete-whole-line))
 
 ;; EDITOR ::= FILE (absolute-path) . EDIT
@@ -730,7 +730,7 @@ End of this match equals start of file contents.
         (let* ((name (get-text-property (point) 'wgrep-line-filename))
                (linum (get-text-property (point) 'wgrep-line-number))
                (start (next-single-property-change
-                       (point) 'wgrep-line-filename nil (line-end-position)))
+                       (point) 'wgrep-line-filename nil (point-at-eol)))
                (file (expand-file-name name default-directory))
                (file-error nil)
                (old (overlay-get ov 'wgrep-old-text))
@@ -859,7 +859,7 @@ NEW may be nil this means deleting whole line."
     ;; Check buffer line was modified after execute grep.
     (unless (string= old
                      (buffer-substring-no-properties
-                      (line-beginning-position) (line-end-position)))
+                      (point-at-bol) (point-at-eol)))
       (signal 'wgrep-error (list "Buffer was changed after grep.")))
     (cond
      (new
@@ -937,7 +937,7 @@ a file."
   (when (null (current-message))
     (let ((ov (catch 'found
                 (dolist (o (overlays-in
-                            (line-beginning-position) (line-end-position)))
+                            (point-at-bol) (point-at-eol)))
                   (when (overlay-get o 'wgrep-reject-message)
                     (throw 'found o))))))
       (when ov

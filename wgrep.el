@@ -185,8 +185,7 @@ Key to enable `wgrep-mode'."
 ;; Error
 ;;
 
-(put 'wgrep-error 'error-conditions '(wgrep-error error))
-(put 'wgrep-error 'error-message "wgrep error")
+(define-error 'wgrep-error "wgrep error")
 
 ;;
 ;; Overwride functions / regexp

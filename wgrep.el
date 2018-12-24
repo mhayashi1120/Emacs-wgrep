@@ -791,8 +791,8 @@ End of this match equals start of file contents.
       (setcar edit (point-marker)))))
 
 (defun wgrep-commit-file (editor)
-  ;; Apply FILE-TRAN.
-  ;; See `wgrep-compute-transaction'
+  ;; Apply EDITOR See `wgrep-compute-transaction'
+  ;; Return succeeded count and result overlay in *grep* buffer.
   (let* ((file (car editor))
          (edits (cdr editor))
          (open-buffer (get-file-buffer file))
@@ -812,25 +812,28 @@ End of this match equals start of file contents.
         (widen)
         (wgrep-display-physical-data)
         (wgrep-compute-linum-to-marker edits)
-        (let ((done 0))
-          (let ((inhibit-read-only wgrep-change-readonly-file))
-            (dolist (edit edits)
-              (let ((marker (nth 0 edit))
-                    (old (nth 1 edit))
-                    (new (nth 2 edit))
-                    (result (nth 3 edit))
-                    (ov (nth 4 edit)))
-                (condition-case err
-                    (progn
-                      ;; check the buffer while each of overlays
-                      ;; to set a result message.
-                      (wgrep-check-buffer)
-                      (wgrep-apply-change marker old new)
-                      (wgrep-put-done-result result)
-                      (delete-overlay ov)
-                      (setq done (1+ done)))
-                  (error
-                   (wgrep-put-reject-result result (cdr err)))))))
+        (let ((done 0)
+              (first-result nil)
+              (inhibit-read-only wgrep-change-readonly-file))
+          (dolist (edit edits)
+            (let ((marker (nth 0 edit))
+                  (old (nth 1 edit))
+                  (new (nth 2 edit))
+                  (result (nth 3 edit))
+                  (ov (nth 4 edit)))
+              (condition-case err
+                  (progn
+                    ;; check the buffer while each of overlays
+                    ;; to set a result message.
+                    (wgrep-check-buffer)
+                    (wgrep-apply-change marker old new)
+                    (wgrep-put-done-result result)
+                    (delete-overlay ov)
+                    (unless first-result
+                      (setq first-result result))
+                    (setq done (1+ done)))
+                (error
+                 (wgrep-put-reject-result result (cdr err))))))
           (when (and wgrep-auto-apply-disk
                      (> done 0))
             (cond
@@ -842,7 +845,7 @@ End of this match equals start of file contents.
             ;; TODO when applying all fail. TMP buffer is left... BUG!
             (when (null open-buffer)
               (kill-buffer)))
-          done)))))
+          (list done first-result))))))
 
 (defun wgrep-apply-change (marker old new)
   "The changes in the *grep* buffer are applied to the file.
@@ -969,12 +972,12 @@ These changes are not immediately saved to disk unless
     (while tran
       (let* ((editor (car tran))
              (commited (wgrep-commit-file editor))
-             ;; TODO more
-             (result (nth 3 (cadr editor))))
-        (when (overlayp result)
+             (count (nth 0 commited))
+             (result (nth 1 commited)))
+        (when result
           (goto-char (overlay-start result))
           (forward-line 0))
-        (setq done (+ done commited))
+        (setq done (+ done count))
         (setq tran (cdr tran))
         (let (message-log-max)
           (message "Writing %d files, %d files are left..."

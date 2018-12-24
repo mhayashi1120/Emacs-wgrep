@@ -790,11 +790,11 @@ End of this match equals start of file contents.
       (wgrep-goto-line linum)
       (setcar edit (point-marker)))))
 
-(defun wgrep-commit-file (file-tran)
+(defun wgrep-commit-file (editor)
   ;; Apply FILE-TRAN.
   ;; See `wgrep-compute-transaction'
-  (let* ((file (car file-tran))
-         (edits (cdr file-tran))
+  (let* ((file (car editor))
+         (edits (cdr editor))
          (open-buffer (get-file-buffer file))
          (buffer
           (cond
@@ -967,10 +967,10 @@ These changes are not immediately saved to disk unless
                          " Apply the changes to disk with non-confirmation?")))
         (setq wgrep-auto-apply-disk t))))
     (while tran
-      (let* ((file-tran (car tran))
-             (commited (wgrep-commit-file file-tran))
+      (let* ((editor (car tran))
+             (commited (wgrep-commit-file editor))
              ;; TODO more
-             (result (nth 3 (cadr file-tran))))
+             (result (nth 3 (cadr editor))))
         (when (overlayp result)
           (goto-char (overlay-start result))
           (forward-line 0))

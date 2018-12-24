@@ -277,7 +277,7 @@ End of this match equals start of file contents.
           (setq res (cons ov res))))
       (nreverse res))))
 
-(defun wgrep-edit-overlays ()
+(defun wgrep-edit-field-overlays ()
   (let (res)
     (dolist (ov (overlays-in (point-min) (point-max)))
       (when (overlay-get ov 'wgrep-changed)
@@ -716,15 +716,15 @@ End of this match equals start of file contents.
   (wgrep-delete-whole-line))
 
 ;; EDITOR ::= FILE (absolute-path) . EDIT
-;; EDIT ::= linum old-text new-text result-overlay edit-overlay
+;; EDIT ::= linum old-text new-text result-overlay edit-field-overlay
 (defun wgrep-gather-editor ()
   (let (res)
-    (dolist (ov (wgrep-edit-overlays))
-      (goto-char (overlay-start ov))
+    (dolist (edit-field (wgrep-edit-field-overlays))
+      (goto-char (overlay-start edit-field))
       (forward-line 0)
       (cond
        ;; ignore removed line or removed overlay
-       ((eq (overlay-start ov) (overlay-end ov)))
+       ((eq (overlay-start edit-field) (overlay-end edit-field)))
        ((get-text-property (point) 'wgrep-line-filename)
         (let* ((name (get-text-property (point) 'wgrep-line-filename))
                (linum (get-text-property (point) 'wgrep-line-number))
@@ -732,22 +732,22 @@ End of this match equals start of file contents.
                        (point) 'wgrep-line-filename nil (point-at-eol)))
                (file (expand-file-name name default-directory))
                (file-error nil)
-               (old (overlay-get ov 'wgrep-old-text))
-               (new (overlay-get ov 'wgrep-edit-text))
+               (old (overlay-get edit-field 'wgrep-old-text))
+               (new (overlay-get edit-field 'wgrep-edit-text))
                result)
           ;; wgrep-result overlay show the commiting of this editing
           (catch 'done
-            (dolist (o (overlays-in (overlay-start ov) (overlay-end ov)))
+            (dolist (o (overlays-in (overlay-start edit-field) (overlay-end edit-field)))
               (when (overlay-get o 'wgrep-result)
                 ;; get existing overlay
                 (setq result o)
                 (throw 'done t)))
             ;; create overlay to show result of committing
-            (setq result (wgrep-make-overlay start (overlay-end ov)))
+            (setq result (wgrep-make-overlay start (overlay-end edit-field)))
             (overlay-put result 'wgrep-result t))
           (setq res
                 (cons
-                 (list file linum old new result ov)
+                 (list file linum old new result edit-field)
                  res))))))
     (nreverse res)))
 
@@ -791,8 +791,8 @@ End of this match equals start of file contents.
       (setcar edit (point-marker)))))
 
 (defun wgrep-commit-file (editor)
-  ;; Apply EDITOR See `wgrep-compute-transaction'
-  ;; Return succeeded count and result overlay in *grep* buffer.
+  ;; Apply EDITOR to file/buffer. See `wgrep-compute-transaction'.
+  ;; Return succeeded count and first result overlay in *grep* buffer.
   (let* ((file (car editor))
          (edits (cdr editor))
          (open-buffer (get-file-buffer file))
@@ -819,21 +819,21 @@ End of this match equals start of file contents.
             (let ((marker (nth 0 edit))
                   (old (nth 1 edit))
                   (new (nth 2 edit))
-                  (result (nth 3 edit))
-                  (ov (nth 4 edit)))
+                  (result-ov (nth 3 edit))
+                  (edit-ov (nth 4 edit)))
               (condition-case err
                   (progn
                     ;; check the buffer while each of overlays
                     ;; to set a result message.
                     (wgrep-check-buffer)
                     (wgrep-apply-change marker old new)
-                    (wgrep-put-done-result result)
-                    (delete-overlay ov)
+                    (wgrep-put-done-result result-ov)
+                    (delete-overlay edit-ov)
                     (unless first-result
-                      (setq first-result result))
+                      (setq first-result result-ov))
                     (setq done (1+ done)))
                 (error
-                 (wgrep-put-reject-result result (cdr err))))))
+                 (wgrep-put-reject-result result-ov (cdr err))))))
           (when (and wgrep-auto-apply-disk
                      (> done 0))
             (cond
@@ -986,7 +986,7 @@ These changes are not immediately saved to disk unless
     (wgrep-cleanup-temp-buffer)
     (wgrep-to-original-mode)
     (let ((msg (format "(%d changed)" done))
-          (ovs (wgrep-edit-overlays)))
+          (ovs (wgrep-edit-field-overlays)))
       (cond
        ((null ovs)
         (if (= done 0)
@@ -1070,7 +1070,7 @@ for several minutes.
   (setq buffer-read-only nil)
   (buffer-enable-undo)
   ;; restore modified status
-  (set-buffer-modified-p (wgrep-edit-overlays))
+  (set-buffer-modified-p (wgrep-edit-field-overlays))
   (setq buffer-undo-list nil)
   (message "%s" (substitute-command-keys
                  "Press \\[wgrep-finish-edit] when finished \
@@ -1083,9 +1083,9 @@ or \\[wgrep-abort-changes] to abort changes.")))
     (dolist (b (buffer-list))
       (with-current-buffer b
         (let ((ovs (wgrep-file-overlays)))
-        (when (and ovs (buffer-modified-p))
-          (basic-save-buffer)
-          (setq count (1+ count))))))
+          (when (and ovs (buffer-modified-p))
+            (basic-save-buffer)
+            (setq count (1+ count))))))
     (cond
      ((= count 0)
       (message "No buffer has been saved."))

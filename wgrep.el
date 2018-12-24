@@ -717,7 +717,7 @@ End of this match equals start of file contents.
 
 ;; EDITOR ::= FILE (absolute-path) . EDIT
 ;; EDIT ::= linum old-text new-text result-overlay edit-overlay
-(defun wgrep-gather-editors ()
+(defun wgrep-gather-editor ()
   (let (res)
     (dolist (ov (wgrep-edit-overlays))
       (goto-char (overlay-start ov))
@@ -752,30 +752,30 @@ End of this match equals start of file contents.
     (nreverse res)))
 
 (defun wgrep-compute-transaction ()
-  (let ((editors (wgrep-gather-editors))
-        ;; FILE-EDITOR ::= FILE . EDITS
+  (let ((editors (wgrep-gather-editor))
+        ;; EDITOR ::= FILE . EDITS
         ;; EDITS ::= EDIT [...]
-        file-editors tran)
+        editor-group tran)
     (dolist (editor editors)
       (let* ((file (car editor))
              (edit (cdr editor))
-             (file-editor (assoc file file-editors)))
-        (unless file-editor
-          (setq file-editor (cons file nil))
-          (setq file-editors (cons file-editor file-editors)))
+             (editor-cache (assoc file editor-group)))
+        (unless editor-cache
+          (setq editor-cache (cons file nil))
+          (setq editor-group (cons editor-cache editor-group)))
         ;; construct with current settings
-        (setcdr file-editor (cons edit (cdr file-editor)))))
-    (setq file-editors (nreverse file-editors))
+        (setcdr editor-cache (cons edit (cdr editor-cache)))))
+    (setq editor-group (nreverse editor-group))
 
     ;; Check file accessibility
-    (dolist (file-editor file-editors)
-      (let ((file (car file-editor)))
+    (dolist (editor editor-group)
+      (let ((file (car editor)))
         (condition-case err
             (progn
               (wgrep-check-file file)
-              (setq tran (cons file-editor tran)))
+              (setq tran (cons editor tran)))
           (wgrep-error
-           (dolist (edit (cdr file-editor))
+           (dolist (edit (cdr editor))
              (let ((result (nth 3 edit)))
                (wgrep-put-reject-result result (cdr err))))))))
 
@@ -794,7 +794,7 @@ End of this match equals start of file contents.
   ;; Apply FILE-TRAN.
   ;; See `wgrep-compute-transaction'
   (let* ((file (car file-tran))
-         (tran (cdr file-tran))
+         (edits (cdr file-tran))
          (open-buffer (get-file-buffer file))
          (buffer
           (cond
@@ -811,15 +811,15 @@ End of this match equals start of file contents.
       (save-restriction
         (widen)
         (wgrep-display-physical-data)
-        (wgrep-compute-linum-to-marker tran)
+        (wgrep-compute-linum-to-marker edits)
         (let ((done 0))
           (let ((inhibit-read-only wgrep-change-readonly-file))
-            (dolist (info tran)
-              (let ((marker (nth 0 info))
-                    (old (nth 1 info))
-                    (new (nth 2 info))
-                    (result (nth 3 info))
-                    (ov (nth 4 info)))
+            (dolist (edit edits)
+              (let ((marker (nth 0 edit))
+                    (old (nth 1 edit))
+                    (new (nth 2 edit))
+                    (result (nth 3 edit))
+                    (ov (nth 4 edit)))
                 (condition-case err
                     (progn
                       ;; check the buffer while each of overlays
@@ -839,6 +839,7 @@ End of this match equals start of file contents.
              (t
               (let ((coding-system-for-write buffer-file-coding-system))
                 (write-region (point-min) (point-max) file nil 'no-msg))))
+            ;; TODO when applying all fail. TMP buffer is left... BUG!
             (when (null open-buffer)
               (kill-buffer)))
           done)))))
@@ -968,7 +969,7 @@ These changes are not immediately saved to disk unless
     (while tran
       (let* ((file-tran (car tran))
              (commited (wgrep-commit-file file-tran))
-             ;; TODO show progress
+             ;; TODO more
              (result (nth 3 (cadr file-tran))))
         (when (overlayp result)
           (goto-char (overlay-start result))

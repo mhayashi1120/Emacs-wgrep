@@ -282,7 +282,7 @@ End of this match equals start of file contents.
     (dolist (ov (overlays-in (point-min) (point-max)))
       (when (overlay-get ov 'wgrep-changed)
         (setq res (cons ov res))))
-    (nreverse res)))
+    (sort res (lambda (x y) (< (overlay-start x) (overlay-start y))))))
 
 ;;;
 ;;; grep result handler

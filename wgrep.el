@@ -715,8 +715,9 @@ End of this match equals start of file contents.
    (point-at-bol) (point-at-eol))
   (wgrep-delete-whole-line))
 
-;; EDITOR ::= FILE (absolute-path) . EDIT
-;; EDIT ::= linum old-text new-text result-overlay edit-field-overlay
+;; EDITOR ::= FILE (absolute-path) . EDITS
+;; EDITS ::= EDIT [...]
+;; EDIT ::= linum-or-marker old-text new-text result-overlay edit-field-overlay
 (defun wgrep-gather-editor ()
   (let (res)
     (dolist (edit-field (wgrep-edit-field-overlays))
@@ -747,24 +748,22 @@ End of this match equals start of file contents.
             (overlay-put result 'wgrep-result t))
           (setq res
                 (cons
-                 (list file linum old new result edit-field)
+                 (list file (list linum old new result edit-field))
                  res))))))
     (nreverse res)))
 
 (defun wgrep-compute-transaction ()
   (let ((editors (wgrep-gather-editor))
-        ;; EDITOR ::= FILE . EDITS
-        ;; EDITS ::= EDIT [...]
         editor-group tran)
     (dolist (editor editors)
       (let* ((file (car editor))
-             (edit (cdr editor))
+             (edits (cdr editor))
              (editor-cache (assoc file editor-group)))
         (unless editor-cache
           (setq editor-cache (cons file nil))
           (setq editor-group (cons editor-cache editor-group)))
         ;; construct with current settings
-        (setcdr editor-cache (cons edit (cdr editor-cache)))))
+        (setcdr editor-cache (append (cdr editor-cache) edits))))
     (setq editor-group (nreverse editor-group))
 
     ;; Check file accessibility
@@ -841,10 +840,11 @@ End of this match equals start of file contents.
               (basic-save-buffer))
              (t
               (let ((coding-system-for-write buffer-file-coding-system))
-                (write-region (point-min) (point-max) file nil 'no-msg))))
-            ;; TODO when applying all fail. TMP buffer is left... BUG!
+                (write-region (point-min) (point-max) file nil 'no-msg)))))
+          ;; TODO more consideration and test
+          (when wgrep-auto-apply-disk
             (when (null open-buffer)
-              (kill-buffer)))
+              (kill-buffer buffer)))
           (list done first-result))))))
 
 (defun wgrep-apply-change (marker old new)

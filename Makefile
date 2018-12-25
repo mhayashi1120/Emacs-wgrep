@@ -32,4 +32,4 @@ clean-ext:
 	rm -rf ext
 
 clean:
-	rm *.elc
+	rm -f *.elc

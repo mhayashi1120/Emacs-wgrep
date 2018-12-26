@@ -26,46 +26,46 @@
 ;; wgrep allows you to edit a grep buffer and apply those changes to
 ;; the file buffer.
 
-;;; Install:
+;; ## Install:
 
 ;; Put this file into load-path'ed directory, and byte compile it if
 ;; desired. And put the following expression into your ~/.emacs.
 ;;
 ;;     (require 'wgrep)
 
-;;; Usage:
+;; ## Usage:
 
-;; You can edit the text in the *grep* buffer after typing C-c C-p.
+;; You can edit the text in the *grep* buffer after typing `C-c C-p` .
 ;; After that the changed text is highlighted.
 ;; The following keybindings are defined:
 
-;; C-c C-e : Apply the changes to file buffers.
-;; C-c C-u : All changes are unmarked and ignored.
-;; C-c C-d : Mark as delete to current line (including newline).
-;; C-c C-r : Remove the changes in the region (these changes are not
-;;           applied to the files. Of course, the remaining
-;;           changes can still be applied to the files.)
-;; C-c C-p : Toggle read-only area.
-;; C-c C-k : Discard all changes and exit.
-;; C-x C-q : Exit wgrep mode.
+;; * `C-c C-e`: Apply the changes to file buffers.
+;; * `C-c C-u`: All changes are unmarked and ignored.
+;; * `C-c C-d`: Mark as delete to current line (including newline).
+;; * `C-c C-r`: Remove the changes in the region (these changes are not
+;;   applied to the files. Of course, the remaining
+;;   changes can still be applied to the files.)
+;; * `C-c C-p`: Toggle read-only area.
+;; * `C-c C-k`: Discard all changes and exit.
+;; * `C-x C-q`: Exit wgrep mode.
 
 ;; * To save all buffers that wgrep has changed, run
 ;;
-;;   M-x wgrep-save-all-buffers
+;;     M-x wgrep-save-all-buffers
 
 ;; * To save buffer automatically when `wgrep-finish-edit'.
 ;;
-;; (setq wgrep-auto-save-buffer t)
+;;     (setq wgrep-auto-save-buffer t)
 
 ;; * You can change the default key binding to switch to wgrep.
 ;;
-;; (setq wgrep-enable-key "r")
+;;     (setq wgrep-enable-key "r")
 
 ;; * To apply all changes wheather or not buffer is read-only.
 ;;
-;; (setq wgrep-change-readonly-file t)
+;;     (setq wgrep-change-readonly-file t)
 
-;;; History:
+;; ## History:
 
 ;; This program is a forked version. the original version can be downloaded from
 ;; http://www.bookshelf.jp/elc/grep-edit.el
@@ -188,7 +188,7 @@ Key to enable `wgrep-mode'."
 (define-error 'wgrep-error "wgrep error")
 
 ;;
-;; Overwride functions / regexp
+;; Overridable functions / regexp
 ;;
 
 (defvar wgrep-line-file-regexp wgrep-default-line-header-regexp
@@ -197,8 +197,18 @@ Key to enable `wgrep-mode'."
 That capture 1: filename 3: line-number
 End of this match equals start of file contents.
 ")
-(defvar wgrep-results-parser 'wgrep-parse-command-results)
-(defvar wgrep-header/footer-parser 'wgrep-prepare-header/footer)
+
+(defvar wgrep-results-parser 'wgrep-parse-command-results
+  "This function parse line oriented command output and set following properties.
+`wgrep-line-filename', `wgrep-line-number', `wgrep-ignore' and
+`wgrep-construct-filename-property' function construct the property name with
+`wgrep-line-filename' and the value is same. This property is used for searching
+ correct point of filename.
+Not like `wgrep-header/footer-parser' should not set `read-only' property.")
+
+(defvar wgrep-header/footer-parser 'wgrep-prepare-header/footer
+  "This function should set text properties `read-only' and `wgrep-header' to
+non editable region.")
 
 ;;;
 ;;; Basic utilities
@@ -246,13 +256,6 @@ End of this match equals start of file contents.
     (signal 'wgrep-error (list "File does not exist.")))
   (unless (file-writable-p file)
     (signal 'wgrep-error (list "File is not writable."))))
-
-(defun wgrep-check-buffer ()
-  "Check the file's status. If it is possible to change the file, return t"
-  (when (and (not wgrep-change-readonly-file)
-             buffer-read-only)
-    (signal 'wgrep-error
-            (list (format "Buffer \"%s\" is read-only." (buffer-name))))))
 
 ;;
 ;; overlay
@@ -671,6 +674,11 @@ End of this match equals start of file contents.
   (let ((message (mapconcat (lambda (x) (format "%s" x)) error-data " ")))
     (wgrep-set-result ov 'wgrep-reject-face message)))
 
+(defun wgrep-put-reject-result-all (editor error-data)
+  (dolist (edit (cdr editor))
+    (let ((result (nth 3 edit)))
+      (wgrep-put-reject-result result error-data))))
+
 (defun wgrep-after-save-hook ()
   (remove-hook 'after-save-hook 'wgrep-after-save-hook t)
   (dolist (ov (wgrep-file-overlays))
@@ -774,9 +782,7 @@ End of this match equals start of file contents.
               (wgrep-check-file file)
               (setq tran (cons editor tran)))
           (wgrep-error
-           (dolist (edit (cdr editor))
-             (let ((result (nth 3 edit)))
-               (wgrep-put-reject-result result (cdr err))))))))
+           (wgrep-put-reject-result-all editor (cdr err))))))
 
     (nreverse tran)))
 
@@ -788,6 +794,48 @@ End of this match equals start of file contents.
       ;; get a marker
       (wgrep-goto-line linum)
       (setcar edit (point-marker)))))
+
+;; TODO considering points
+;; 1. file has already been visited via `find-file-noselect"
+;;   -> Top priority! Obey the user editing buffer.
+;; 2. file is not visited.
+;; 3. too many buffers. automatic saving.
+;; 4. `wgrep-auto-save-buffer' is on.
+;; 5. visited file buffer has been changed after grep.
+;; 6. TODO
+
+(defun wgrep-commit-edits (editor)
+  (let ((file (car editor))
+        (edits (cdr editor)))
+    (wgrep-compute-linum-to-marker edits)
+    (let ((done 0)
+          (first-result nil)
+          (inhibit-read-only wgrep-change-readonly-file))
+      (dolist (edit edits)
+        (let ((marker (nth 0 edit))
+              (old (nth 1 edit))
+              (new (nth 2 edit))
+              (result-ov (nth 3 edit))
+              (edit-ov (nth 4 edit)))
+          (condition-case err
+              (progn
+                (unless first-result
+                  (setq first-result result-ov))
+                (wgrep-apply-change marker old new)
+                (wgrep-put-done-result result-ov)
+                (delete-overlay edit-ov)
+                (setq done (1+ done)))
+            (error
+             (wgrep-put-reject-result result-ov (cdr err))))))
+      (cond
+       ((or (not wgrep-auto-apply-disk)
+            (= done 0)))
+       (buffer-file-name
+        (basic-save-buffer))
+       (t
+        (let ((coding-system-for-write buffer-file-coding-system))
+          (write-region (point-min) (point-max) file nil 'no-msg))))
+      (list done first-result))))
 
 (defun wgrep-commit-file (editor)
   ;; Apply EDITOR to file/buffer. See `wgrep-compute-transaction'.
@@ -806,46 +854,25 @@ End of this match equals start of file contents.
               buf))
            (t
             (find-file-noselect file)))))
-    (with-current-buffer buffer
-      (save-restriction
-        (widen)
-        (wgrep-display-physical-data)
-        (wgrep-compute-linum-to-marker edits)
-        (let ((done 0)
-              (first-result nil)
-              (inhibit-read-only wgrep-change-readonly-file))
-          (dolist (edit edits)
-            (let ((marker (nth 0 edit))
-                  (old (nth 1 edit))
-                  (new (nth 2 edit))
-                  (result-ov (nth 3 edit))
-                  (edit-ov (nth 4 edit)))
-              (condition-case err
-                  (progn
-                    ;; check the buffer while each of overlays
-                    ;; to set a result message.
-                    (wgrep-check-buffer)
-                    (wgrep-apply-change marker old new)
-                    (wgrep-put-done-result result-ov)
-                    (delete-overlay edit-ov)
-                    (unless first-result
-                      (setq first-result result-ov))
-                    (setq done (1+ done)))
-                (error
-                 (wgrep-put-reject-result result-ov (cdr err))))))
-          (when (and wgrep-auto-apply-disk
-                     (> done 0))
+    (unwind-protect
+        (with-current-buffer buffer
+          (save-restriction
+            (widen)
+            (wgrep-display-physical-data)
+
             (cond
-             (buffer-file-name
-              (basic-save-buffer))
+             ((and (not wgrep-change-readonly-file)
+                   buffer-read-only)
+              (wgrep-put-reject-result-all
+               editor
+               (list (format "Buffer \"%s\" is read-only." (buffer-name))))
+              (list 0 nil))
              (t
-              (let ((coding-system-for-write buffer-file-coding-system))
-                (write-region (point-min) (point-max) file nil 'no-msg)))))
-          ;; TODO more consideration and test
-          (when wgrep-auto-apply-disk
-            (when (null open-buffer)
-              (kill-buffer buffer)))
-          (list done first-result))))))
+              (wgrep-commit-edits editor)))))
+      ;; TODO more consideration and test
+      (when wgrep-auto-apply-disk
+        (when (null open-buffer)
+          (kill-buffer buffer))))))
 
 (defun wgrep-apply-change (marker old new)
   "The changes in the *grep* buffer are applied to the file.

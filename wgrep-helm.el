@@ -4,8 +4,8 @@
 ;; Keywords: grep edit extensions
 ;; Package-Requires: ((wgrep "2.1.1"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-helm.el
-;; Emacs: GNU Emacs 22 or later
-;; Version: 0.1.5
+;; Emacs: GNU Emacs 25 or later
+;; Version: 2.3.0
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as

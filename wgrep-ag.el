@@ -2,7 +2,7 @@
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Keywords: grep edit extensions
-;; Package-Requires: ((wgrep "2.1.5") (cl-lib "0.5"))
+;; Package-Requires: ((wgrep "2.1.5"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-ag.el
 ;; Emacs: GNU Emacs 22 or later
 ;; Version: 0.1.9
@@ -48,68 +48,117 @@
 ;;; Code:
 
 (require 'wgrep)
-(require 'cl-lib)
+
+(defvar wgrep-ag-grouped-result-file-regexp "^File:[[:space:]]+\\(.*\\)$"
+  "Regular expression for the start of results for a file in grouped results.
+\"Grouped results\" are what you get from ag.el when
+`ag-group-matches' is true or when you call ag with --group.")
+
+(defvar wgrep-ag-ungrouped-result-regexp
+  "^\\(.+?\\):\\([[:digit:]]+\\)\\(?:-\\|:[[:digit:]]+:\\)"
+  "Regular expression for an ungrouped result.
+You get \"ungrouped results\" when `ag-group-matches' is false or
+when you manage to call ag with --nogroup.")
 
 (defun wgrep-ag-prepare-header/footer ()
   (save-excursion
     (goto-char (point-min))
-    (when (not (get-text-property (point) 'compilation-message))
-      (let ((first-result (next-single-property-change (point)
-                                                       'compilation-message)))
-        ;; Maybe ag was run with --group?  Pedantry demands that I not
-        ;; mark the first "File:" line as part of the wgrep-header.
-        (when first-result
-          (goto-char first-result)
-          (when (and (zerop (forward-line -1))
-                     (looking-at-p "^File: "))
-             (setq first-result (point))))
-        (add-text-properties (point-min) (or first-result (point-max))
-                             '(read-only t wgrep-header t))))
-    (goto-char (point-max))
-    (forward-line 0)
-    (when (not (or (get-text-property (point) 'compilation-message)
-                   (get-text-property (point) 'wgrep-header)))
-      (goto-char (previous-single-property-change (point) 'compilation-message))
-      (forward-line 1)
-      (add-text-properties (point) (point-max)
-                           '(read-only t wgrep-footer t)))))
+    ;; Look for the first useful result line.
+    (let ((result-line-regexp (concat wgrep-ag-grouped-result-file-regexp
+                                      "\\|"
+                                      wgrep-ag-ungrouped-result-regexp)))
+      (if (not (re-search-forward result-line-regexp nil t))
+          ;; No results in this buffer, let's mark the whole thing as
+          ;; header.
+          (add-text-properties (point-min) (point-max)
+                               '(read-only t wgrep-header t))
+        (add-text-properties (point-min) (line-beginning-position)
+                             '(read-only t wgrep-header t))
+        (goto-char (point-max))
+        (re-search-backward result-line-regexp nil t)
+        ;; Point is now at the beginning of the result nearest the end
+        ;; of the buffer, AKA the last result.  Move to the start of
+        ;; the line after the last result, and mark everything from
+        ;; that line forward as wgrep-footer.  If we can't move to the
+        ;; line after the last line then there apparently is no
+        ;; footer.
+        (when (zerop (forward-line 1))
+          (add-text-properties (point) (point-max)
+                               '(read-only t wgrep-footer t)))))))
 
 (defun wgrep-ag-parse-command-results ()
+  ;; Note that this function is called with the buffer narrowed to
+  ;; exclude the header and the footer.  (We're going to assert that
+  ;; fact here, because we use (bobp) result a bit further down to
+  ;; decide that we're not reading grouped results; see below.)
+  (unless (bobp)
+    (error "Expected to be called with point at beginning of buffer"))
   (save-excursion
-    (goto-char (point-min))
-    (cl-loop
-       with last-file-name
-       for ref-start = (point) then (next-single-property-change
-                                     (point)
-                                     'compilation-message)
-       while ref-start
-       do
-         (goto-char ref-start)
-         (let ((compile-msg (get-text-property (point)
-                                               'compilation-message)))
-           ;; This should always be true, but just in case:
-           (when compile-msg
-             (let ((ref-end (next-single-property-change (point)
-                                                         'compilation-message)))
-               (goto-char ref-end)
-               ;; We expect to be able to find the end of this
-               ;; compilation message before running into another one.
-               (unless (get-text-property (point) 'compilation-message)
-                 (let* ((loc (compilation--message->loc compile-msg))
-                        (line-num (compilation--loc->line loc))
-                        (file-name (car (compilation--file-struct->file-spec
-                                         (compilation--loc->file-struct loc)))))
-                   (unless (string= file-name last-file-name)
-                     (put-text-property ref-start ref-end
-                                        (wgrep-construct-filename-property
-                                         file-name)
-                                        file-name)
-                     (setq last-file-name file-name))
-                   (add-text-properties ref-start ref-end
-                                        (list 'wgrep-line-filename
-                                              file-name
-                                              'wgrep-line-number
-                                              line-num))))))))))
+    ;; First look for grouped results (`ag-group-matches' is/was
+    ;; probably true).
+    (while (re-search-forward wgrep-ag-grouped-result-file-regexp nil t)
+      ;; Ignore the line that introduces matches from a file, so that
+      ;; wgrep doesn't let you edit it.
+      (add-text-properties (match-beginning 0) (match-end 0)
+                           '(wgrep-ignore t))
+      (let ((file-name (match-string-no-properties 1)))
+        ;; Note that I think wgrep uses this property to quickly find
+        ;; the file it's interested in when searching during some
+        ;; operation(s).  We stick it on the file name in the results
+        ;; group header.
+        (add-text-properties (match-beginning 1) (match-end 1)
+                             (list (wgrep-construct-filename-property file-name)
+                                   file-name))
+        ;; Matches are like: 999:55:line content here
+        ;; Context lines are like: 999-line content here
+        ;;
+        ;; When context is enabled, matches from different parts of
+        ;; the same file are separated by a line containing just "--".
+        ;; The group of matches from a single file is terminated by a
+        ;; blank line.
+        (while (and (zerop (forward-line 1))
+                    (looking-at
+                     (concat "^\\([[:digit:]]+\\)\\(?::[[:digit:]]+:\\|-\\)"
+                             "\\|\\(^--$\\)")))
+          (if (match-beginning 2)
+              ;; Ignore "--" line.
+              (add-text-properties (match-beginning 0) (match-end 0)
+                                   '(wgrep-ignore t))
+            (add-text-properties (match-beginning 0) (match-end 0)
+                                 (list 'wgrep-line-filename file-name
+                                       'wgrep-line-number
+                                       (string-to-number (match-string 1))))))))
+    (when (bobp)
+      ;; Search above never moved point, so match non-grouped results
+      ;; (`ag-group-matches' is/was probably false).
+      (let (last-file-name)
+        ;; Matches are like: /foo/bar:999:55:line content here
+        ;; Context lines are like: /foo/bar:999-line content here
+        ;;
+        ;; With context lines, matches from different parts of the
+        ;; file are separated by a line containing just "--".
+        (while (re-search-forward (concat wgrep-ag-ungrouped-result-regexp
+                                          "\\|\\(^--$\\)")
+                                  nil t)
+          (if (match-beginning 3)
+              ;; Ignore the "--" separator.
+              (add-text-properties (match-beginning 0) (match-end 0)
+                                   '(wgrep-ignore t))
+            (let ((file-name (match-string-no-properties 1))
+                  (line-number (string-to-number (match-string 2))))
+              (unless (equal file-name last-file-name)
+                ;; This line is a result from a different file than
+                ;; the last match (or else this is the first match in
+                ;; the results).  Write the special file name property
+                ;; for wgrep.
+                (let ((file-name-prop
+                       (wgrep-construct-filename-property file-name)))
+                  (add-text-properties (match-beginning 1) (match-end 1)
+                                       (list file-name-prop file-name)))
+                (setq last-file-name file-name))
+              (add-text-properties (match-beginning 0) (match-end 0)
+                                   (list 'wgrep-line-filename file-name
+                                         'wgrep-line-number line-number)))))))))
 
 ;;;###autoload
 (defun wgrep-ag-setup ()

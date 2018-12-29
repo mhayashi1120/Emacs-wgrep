@@ -795,15 +795,6 @@ non editable region.")
       (wgrep-goto-line linum)
       (setcar edit (point-marker)))))
 
-;; TODO considering points
-;; 1. file has already been visited via `find-file-noselect"
-;;   -> Top priority! Obey the user editing buffer.
-;; 2. file is not visited.
-;; 3. too many buffers. automatic saving.
-;; 4. `wgrep-auto-save-buffer' is on.
-;; 5. visited file buffer has been changed after grep.
-;; 6. TODO
-
 (defun wgrep-commit-edits (editor)
   (let ((file (car editor))
         (edits (cdr editor)))
@@ -869,7 +860,6 @@ non editable region.")
               (list 0 nil))
              (t
               (wgrep-commit-edits editor)))))
-      ;; TODO more consideration and test
       (when wgrep-auto-apply-disk
         (when (null open-buffer)
           (kill-buffer buffer))))))

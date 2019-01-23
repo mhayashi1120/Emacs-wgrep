@@ -72,8 +72,11 @@
              (namelen (length dispname)))
         (let* ((value (get-text-property (point) 'helm-realvalue))
                (data  (helm-grep-split-line value))
-               (fn    (or (get-text-property (point) 'buffer-name)
-                          (get-text-property (point) 'helm-grep-fname)))
+               (fn    (let ((bn (get-text-property (point) 'buffer-name))
+                            (fn (get-text-property (point) 'helm-grep-fname)))
+                        (or fn
+                            (when bn
+                              (buffer-file-name (get-buffer bn))))))
                (line  (string-to-number (nth 1 data)))
                (fprop (wgrep-construct-filename-property fn)))
           (put-text-property start end 'wgrep-line-filename fn)

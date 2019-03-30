@@ -71,10 +71,15 @@
              (dispname (match-string 1))
              (namelen (length dispname)))
         (let* ((value (get-text-property (point) 'helm-realvalue))
-               (data  (helm-grep-split-line value))
+               (data  (when (eq major-mode 'helm-grep-mode)
+                        (helm-grep-split-line value)))
                (fn    (or (get-text-property (point) 'buffer-name)
                           (get-text-property (point) 'helm-grep-fname)))
-               (line  (string-to-number (nth 1 data)))
+               (line  (if data
+                          (string-to-number (nth 1 data))
+                        ;; Real value of candidate is now the line
+                        ;; number in helm-occur.
+                        value))
                (fprop (wgrep-construct-filename-property fn)))
           (put-text-property start end 'wgrep-line-filename fn)
           (put-text-property start end 'wgrep-line-number line)
@@ -85,12 +90,12 @@
 (add-hook 'helm-grep-mode-hook 'wgrep-helm-setup)
 
 ;;;###autoload
-(add-hook 'helm-moccur-mode-hook 'wgrep-helm-setup)
+(add-hook 'helm-occur-mode-hook 'wgrep-helm-setup)
 
 ;; For `unload-feature'
 (defun wgrep-helm-unload-function ()
   (remove-hook 'helm-grep-mode-hook 'wgrep-helm-setup)
-  (remove-hook 'helm-moccur-mode-hook 'wgrep-helm-setup))
+  (remove-hook 'helm-occur-mode-hook 'wgrep-helm-setup))
 
 (provide 'wgrep-helm)
 

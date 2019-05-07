@@ -47,7 +47,7 @@ M-x wgrep-save-all-buffers
 (setq wgrep-enable-key "r")
 ```
 
-* To apply all changes wheather or not buffer is read-only.
+* To apply all changes whether or not buffer is read-only.
 
 ```
 (setq wgrep-change-readonly-file t)

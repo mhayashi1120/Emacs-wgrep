@@ -18,7 +18,7 @@
       (buffer-string))))
 
 (defun wgrep-test--prepare-file (file contents &optional cs)
-  ;; cleanup for convinience
+  ;; cleanup for convenience
   (let ((buf (get-file-buffer file)))
     (when (buffer-live-p buf)
       (kill-buffer buf)))
@@ -150,7 +150,7 @@
    (wgrep-test-fixture "a\nb\nc\n"
      (lambda (file)
        (let (;; This test intended to check modified buffer is existing.
-             ;; Keep that buffer is modifing while calling grep.
+             ;; Keep that buffer is modifying while calling grep.
              (grep-save-buffers nil))
          (with-current-buffer (find-file-noselect file)
            ;; modify file buffer
@@ -175,7 +175,7 @@
          (wgrep-finish-edit)
          ;; save to file
          (wgrep-save-all-buffers)
-         ;; compare file contents is valid. (keep preceeding file buffer's contents)
+         ;; compare file contents is valid. (keep preceding file buffer's contents)
          (should (equal "hoge\nfoo\nC\n" (wgrep-test--get-contents file))))))))
 
 (ert-deftest wgrep-with-readonly-file ()

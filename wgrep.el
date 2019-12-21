@@ -68,7 +68,7 @@
 ;; ## History:
 
 ;; This program is a forked version. the original version can be downloaded from
-;; http://www.bookshelf.jp/elc/grep-edit.el
+;; https://www.emacswiki.org/emacs/grep-edit.el
 
 ;; Following added implementations and differences.
 ;; * Support GNU grep context option -A -B and -C

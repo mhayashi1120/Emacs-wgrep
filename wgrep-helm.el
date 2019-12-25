@@ -1,5 +1,7 @@
 ;;; wgrep-helm.el --- Writable helm-grep-mode buffer and apply the changes to files
 
+;; Copyright (C) 2010-2019 Masahiro Hayashi
+
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Keywords: grep edit extensions
 ;; Package-Requires: ((wgrep "2.1.1"))

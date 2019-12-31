@@ -72,7 +72,7 @@
 ;; ## History:
 
 ;; This program is a forked version. the original version can be downloaded from
-;; https://www.emacswiki.org/emacs/download/grep-edit.el
+;; https://github.com/mhayashi1120/Emacs-wgrep/raw/import-original-author/grep-edit.el
 
 ;; Following added implementations and differences.
 ;; * Support GNU grep context option -A -B and -C

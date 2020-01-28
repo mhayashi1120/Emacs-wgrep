@@ -1,6 +1,6 @@
 ;;; wgrep-pt.el --- Writable pt buffer and apply the changes to files
 
-;; Copyright (C) 2010-2019 Masahiro Hayashi
+;; Copyright (C) 2010-2020 Masahiro Hayashi
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>, Bailey Ling <bling@live.ca>
 ;; Keywords: grep edit extensions

@@ -1,12 +1,15 @@
 wgrep.el
 ========
 
+## Summary:
+
 wgrep allows you to edit a grep buffer and apply those changes to
-the file buffer.
+the file buffer like `sed` interactively. No need to learn sed
+script, just learn Emacs.
 
 ## Install:
 
-Put this file into load-path'ed directory, and byte compile it if
+Put this file into load-path`ed directory, and byte compile it if
 desired. And put the following expression into your ~/.emacs.
 
 ```
@@ -56,7 +59,7 @@ M-x wgrep-save-all-buffers
 ## History:
 
 This program is a forked version. the original version can be downloaded from
-http://www.bookshelf.jp/elc/grep-edit.el
+https://github.com/mhayashi1120/Emacs-wgrep/raw/import-original-author/grep-edit.el
 
 Following added implementations and differences.
 * Support GNU grep context option -A -B and -C

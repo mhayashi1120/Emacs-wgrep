@@ -55,8 +55,11 @@ M-x wgrep-save-all-buffers
 
 ## History:
 
-This program is a forked version. the original version can be downloaded from
-http://www.bookshelf.jp/elc/grep-edit.el
+This program was forked from Matsushita Akihisa's [grep-edit.el
+v2.9](http://www.bookshelf.jp/elc/grep-edit.el).  As this website is
+now inaccessible,
+[emacswiki.org's](https://www.emacswiki.org/emacs/grep-edit.el) copy
+may be consulted.
 
 Following added implementations and differences.
 * Support GNU grep context option -A -B and -C

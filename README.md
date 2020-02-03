@@ -9,7 +9,7 @@ script, just learn Emacs.
 
 ## Install:
 
-Put this file into load-path`ed directory, and byte compile it if
+Put this file into load-path'ed directory, and byte compile it if
 desired. And put the following expression into your ~/.emacs.
 
 ```
@@ -55,6 +55,19 @@ M-x wgrep-save-all-buffers
 ```
 (setq wgrep-change-readonly-file t)
 ```
+
+### Trivial features:
+
+- wdired.el like interface.
+- Support GNU grep `--context` (`-A` `-B` and `-C`) option.
+- Can handle too many files.
+- Can handle newline insertion in *grep* buffer.
+- Delete whole line include newline.
+
+### Similar softwares:
+
+[GNU sed](https://www.gnu.org/software/sed/)
+[helm-ag](https://github.com/syohex/emacs-helm-ag) has a similar feature.
 
 ## History:
 

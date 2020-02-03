@@ -72,6 +72,19 @@
 ;;
 ;;     (setq wgrep-change-readonly-file t)
 
+;; ### Trivial features:
+
+;; - wdired.el like interface.
+;; - Support GNU grep `--context` (`-A` `-B` and `-C`) option.
+;; - Can handle too many files.
+;; - Can handle newline insertion in *grep* buffer.
+;; - Delete whole line include newline.
+
+;; ### Similar softwares:
+
+;; [GNU sed](https://www.gnu.org/software/sed/)
+;; [helm-ag](https://github.com/syohex/emacs-helm-ag) has a similar feature.
+
 ;; ## History:
 
 ;; This program was forked from Matsushita Akihisa's [grep-edit.el

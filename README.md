@@ -59,12 +59,12 @@ M-x wgrep-save-all-buffers
 ## History:
 
 This program was forked from Matsushita Akihisa's [grep-edit.el
-v2.9](http://www.bookshelf.jp/elc/grep-edit.el).  As this website is
+v2.11](http://www.bookshelf.jp/elc/grep-edit.el).  As this website is
 now inaccessible,
 [emacswiki.org's](https://www.emacswiki.org/emacs/grep-edit.el) copy
 may be consulted.
 
-Imported version (v2.11) can be downloaded from this orphan commit:
+Imported version can be downloaded from this orphan commit:
 https://github.com/mhayashi1120/Emacs-wgrep/tree/import-original-author/
 
 Following added implementations and differences.

@@ -739,7 +739,7 @@ non editable region.")
         end)
     (insert new-text)
     (let* ((end (point))
-           ;; hilight the changed line
+           ;; highlight the changed line
            (ov (wgrep-put-overlay-to-file-buffer beg end)))
       ;; make overlay volatile.
       (wgrep-let-destructive-overlay ov))))
@@ -770,7 +770,7 @@ non editable region.")
                (old (overlay-get edit-field 'wgrep-old-text))
                (new (overlay-get edit-field 'wgrep-edit-text))
                result)
-          ;; wgrep-result overlay show the commiting of this editing
+          ;; wgrep-result overlay show the committing of this editing
           (catch 'done
             (dolist (o (overlays-in (overlay-start edit-field) (overlay-end edit-field)))
               (when (overlay-get o 'wgrep-result)
@@ -1014,9 +1014,9 @@ These changes are not immediately saved to disk unless
         (setq wgrep-auto-apply-disk t))))
     (while tran
       (let* ((editor (car tran))
-             (commited (wgrep-commit-file editor))
-             (count (nth 0 commited))
-             (result (nth 1 commited)))
+             (committed (wgrep-commit-file editor))
+             (count (nth 0 committed))
+             (result (nth 1 committed)))
         (when result
           (goto-char (overlay-start result))
           (forward-line 0))

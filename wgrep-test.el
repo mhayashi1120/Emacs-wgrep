@@ -1,6 +1,7 @@
 (require 'ert)
 (require 'dash)
 (require 's)
+(require 'wgrep)
 
 (defun wgrep-test--wait (buf)
   (let ((proc (get-buffer-process buf)))

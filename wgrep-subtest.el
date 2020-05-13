@@ -1,5 +1,6 @@
 (require 'ert)
 (require 'wgrep-test)
+(require 'ag)
 
 (defun wgrep-test--ag (string file)
   (let ((buf (ag/search string default-directory :file-regex (regexp-quote file) :regexp t)))

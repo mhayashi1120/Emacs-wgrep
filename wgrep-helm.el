@@ -75,7 +75,8 @@
         (let* ((value (get-text-property (point) 'helm-realvalue))
                (data  (when (eq major-mode 'helm-grep-mode)
                         (helm-grep-split-line value)))
-               (fn    (or (get-text-property (point) 'buffer-name)
+               (bufname (get-text-property (point) 'buffer-name))
+               (fn    (or (and bufname (buffer-file-name (get-buffer bufname)))
                           (get-text-property (point) 'helm-grep-fname)))
                (line  (if data
                           (string-to-number (nth 1 data))

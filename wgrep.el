@@ -1009,7 +1009,7 @@ These changes are not immediately saved to disk unless
      ((> all-length wgrep-too-many-file-length)
       (when (y-or-n-p (eval-when-compile
                         (concat
-                         "Edited files are too many." 
+                         "Edited files are too many."
                          " Apply the changes to disk with non-confirmation?")))
         (setq wgrep-auto-apply-disk t))))
     (while tran

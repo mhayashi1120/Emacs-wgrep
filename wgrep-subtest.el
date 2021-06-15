@@ -28,4 +28,3 @@
        (wgrep-save-all-buffers)
        ;; compare file contents is valid
        (should (equal "FOO2\nBAZ\n" (wgrep-test--get-contents file)))))))
-

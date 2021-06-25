@@ -416,30 +416,29 @@ non editable region.")
 (defun wgrep-set-readonly-area (state)
   (let ((inhibit-read-only t)
         (wgrep-inhibit-modification-hook t)
-        pos start end)
+        start end)
     (save-excursion
       ;; set readonly grep result filename
-      (setq pos (point-min))
-      (while (setq start (next-single-property-change
-                          pos 'wgrep-line-filename))
-        (setq end (next-single-property-change
-                   start 'wgrep-line-filename))
+      (setq start (wgrep-goto-first-found))
+      (while (and start
+                  (setq end (next-single-property-change
+                             start 'wgrep-line-filename)))
         (put-text-property start end 'read-only state)
         (put-text-property (1- end) end 'rear-nonsticky t)
         ;; set readonly all newline at end of grep line
         (when (eq (char-before start) ?\n)
           (put-text-property (1- start) start 'read-only state))
-        (setq pos end))
-      (setq pos (point-min))
-      (while (setq start (next-single-property-change
-                          pos 'wgrep-ignore))
-        (setq end (next-single-property-change
-                   start 'wgrep-ignore))
+        (setq start (next-single-property-change
+                     end 'wgrep-line-filename)))
+      (setq start (wgrep-goto-first-found))
+      (while (and start (setq end (next-single-property-change
+                                   start 'wgrep-ignore)))
         (put-text-property start end 'read-only state)
         ;; set readonly all newline at end of grep line
         (when (eq (char-before start) ?\n)
           (put-text-property (1- start) start 'read-only state))
-        (setq pos end))
+        (setq start (next-single-property-change
+                     end 'wgrep-ignore)))
       ;; set readonly last of grep line
       (let ((footer (or (next-single-property-change (point-min) 'wgrep-footer)
                         ;; to consider empty footer.
@@ -1009,7 +1008,7 @@ These changes are not immediately saved to disk unless
      ((> all-length wgrep-too-many-file-length)
       (when (y-or-n-p (eval-when-compile
                         (concat
-                         "Edited files are too many." 
+                         "Edited files are too many."
                          " Apply the changes to disk with non-confirmation?")))
         (setq wgrep-auto-apply-disk t))))
     (while tran

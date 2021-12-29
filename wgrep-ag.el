@@ -1,4 +1,4 @@
-;;; wgrep-ag.el --- Writable ag buffer and apply the changes to files
+;;; wgrep-ag.el --- Writable ag buffer and apply the changes to files -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2020 Masahiro Hayashi
 

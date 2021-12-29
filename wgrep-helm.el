@@ -1,4 +1,4 @@
-;;; wgrep-helm.el --- Writable helm-grep-mode buffer and apply the changes to files
+;;; wgrep-helm.el --- Writable helm-grep-mode buffer and apply the changes to files -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2020 Masahiro Hayashi
 

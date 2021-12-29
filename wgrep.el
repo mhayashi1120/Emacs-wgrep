@@ -1,4 +1,4 @@
-;;; wgrep.el --- Writable grep buffer and apply the changes to files
+;;; wgrep.el --- Writable grep buffer and apply the changes to files -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2020 Masahiro Hayashi
 
@@ -487,10 +487,6 @@ non editable region.")
                (line (string-to-number (match-string 3)))
                (start (match-beginning 0))
                (end (match-end 0))
-               (fstart (match-beginning 1))
-               (fend (match-end 1))
-               (lstart (match-beginning 3))
-               (lend (match-end 3))
                (fprop (wgrep-construct-filename-property fn))
                (flen (length fn)))
           ;; check relative path grep result
@@ -650,7 +646,7 @@ non editable region.")
         (overlay-put ov 'wgrep-edit-text value))))
     ov))
 
-(defun wgrep-after-change-function (beg end leng-before)
+(defun wgrep-after-change-function (beg end _leng-before)
   (cond
    (wgrep-inhibit-modification-hook nil)
    ((= (point-min) (point-max))
@@ -728,15 +724,14 @@ non editable region.")
   (dolist (prop '(modification-hooks insert-in-front-hooks insert-behind-hooks))
     (overlay-put
      ov prop
-     `((lambda (ov after-p &rest ignore)
-         (when after-p
-           (delete-overlay ov)))))))
+     `(,(lambda (ov after-p &rest _ignore)
+          (when after-p
+            (delete-overlay ov)))))))
 
 (defun wgrep-replace-to-new-line (new-text)
   ;; delete grep extracted region (restricted to a line)
   (delete-region (point-at-bol) (point-at-eol))
-  (let ((beg (point))
-        end)
+  (let ((beg (point)))
     (insert new-text)
     (let* ((end (point))
            ;; highlight the changed line
@@ -766,7 +761,6 @@ non editable region.")
                (start (next-single-property-change
                        (point) 'wgrep-line-filename nil (point-at-eol)))
                (file (expand-file-name name default-directory))
-               (file-error nil)
                (old (overlay-get edit-field 'wgrep-old-text))
                (new (overlay-get edit-field 'wgrep-edit-text))
                result)
@@ -858,7 +852,6 @@ non editable region.")
   ;; Apply EDITOR to file/buffer. See `wgrep-compute-transaction'.
   ;; Return succeeded count and first result overlay in *grep* buffer.
   (let* ((file (car editor))
-         (edits (cdr editor))
          (open-buffer (get-file-buffer file))
          (buffer
           (cond
@@ -1009,7 +1002,7 @@ These changes are not immediately saved to disk unless
      ((> all-length wgrep-too-many-file-length)
       (when (y-or-n-p (eval-when-compile
                         (concat
-                         "Edited files are too many." 
+                         "Edited files are too many."
                          " Apply the changes to disk with non-confirmation?")))
         (setq wgrep-auto-apply-disk t))))
     (while tran

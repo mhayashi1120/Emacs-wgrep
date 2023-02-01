@@ -1,4 +1,4 @@
-;;; wgrep-ack.el --- Writable ack-and-a-half buffer and apply the changes to files
+;;; wgrep-ack.el --- Writable ack-and-a-half buffer and apply the changes to files -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2020 Masahiro Hayashi
 

@@ -1,4 +1,4 @@
-;;; wgrep-pt.el --- Writable pt buffer and apply the changes to files
+;;; wgrep-pt.el --- Writable pt buffer and apply the changes to files -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2020 Masahiro Hayashi
 

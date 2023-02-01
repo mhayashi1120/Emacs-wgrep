@@ -1,4 +1,7 @@
-EMACS = emacs
+EMACS ?= emacs
+
+ELC := *.elc
+GENERATED := $(ELC)
 
 check: compile
 	$(EMACS) -q -batch -L . -l wgrep.el -l wgrep-test.el -f ert-run-tests-batch-and-exit
@@ -32,4 +35,4 @@ clean-ext:
 	rm -rf ext
 
 clean:
-	rm -f *.elc
+	rm -f $(GENERATED)

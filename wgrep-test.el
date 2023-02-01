@@ -5,7 +5,7 @@
 
 (defun wgrep-test--wait (buf)
   (let ((proc (get-buffer-process buf)))
-    (while (eq (process-status proc) 'run) 
+    (while (eq (process-status proc) 'run)
       (sit-for 0.1))
     (sleep-for 0.2)
     (switch-to-buffer buf)))

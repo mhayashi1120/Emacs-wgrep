@@ -8,7 +8,7 @@
 ;; Package-Requires: ((emacs "25.1") (wgrep "3.0.0"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-ack.el
 ;; Emacs: GNU Emacs 22 or later
-;; Version: 0.2.0
+;; Version: 1.0.0
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as

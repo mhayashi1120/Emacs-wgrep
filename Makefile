@@ -63,3 +63,9 @@ subtest:
 		-eval "(ert-run-tests-batch-and-exit '(tag wgrep-subtest))"
 
 package: lint check check-extra compile
+	@echo ""
+	@echo "======================================="
+	@echo "Successfuly finished package build. "
+	@echo "Maintainer should add correct `git tag` each pacakges."
+	@echo "======================================="
+	@echo ""

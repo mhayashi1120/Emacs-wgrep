@@ -1,11 +1,11 @@
-;;; wgrep-ack.el --- Writable ack-and-a-half buffer and apply the changes to files -*- lexical-binding: t -*-
+;;; wgrep-ack.el --- Writable ack-and-a-half buffer -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2020,2023 Masahiro Hayashi
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Contributor: Ivan Andrus <darthandrus@gmail.com>
 ;; Keywords: grep edit extensions
-;; Package-Requires: ((wgrep "3.0.0"))
+;; Package-Requires: ((emacs "25.1") (wgrep "3.0.0"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-ack.el
 ;; Emacs: GNU Emacs 22 or later
 ;; Version: 0.2.0

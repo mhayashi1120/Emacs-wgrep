@@ -1,4 +1,4 @@
-;;; wgrep.el --- Writable grep buffer and apply the changes to files -*- lexical-binding: t -*-
+;;; wgrep.el --- Writable grep buffer -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2020,2023 Masahiro Hayashi
 
@@ -231,9 +231,11 @@ End of this match equals start of file contents.
 `wgrep-construct-filename-property' function construct the property name with
 `wgrep-line-filename' and the value is same. This property is used for searching
  correct point of filename.
-Not like `wgrep-header/footer-parser' should not set `read-only' property.")
+Not like `wgrep-header&footer-parser' should not set `read-only' property.")
 
-(defvar wgrep-header/footer-parser 'wgrep-prepare-header/footer
+;; Previously named `wgrep-header/footer-parser` this name violate `package-lint`
+;; conventions.
+(defvar wgrep-header&footer-parser 'wgrep-prepare-header&footer
   "This function should set text properties `read-only' and `wgrep-header' to
 non editable region.")
 
@@ -556,11 +558,14 @@ non editable region.")
       (let ((inhibit-read-only t)
             (wgrep-inhibit-modification-hook t)
             buffer-read-only)
-        (funcall wgrep-header/footer-parser)
+        (funcall (or wgrep-header&footer-parser
+                     ;; TODO FIXME: workaround compat for previous code.
+                     (and (boundp 'wgrep-header/footer-parser)
+                          wgrep-header/footer-parser)))
         (wgrep-prepare-context)
         (setq wgrep-prepared t)))))
 
-(defun wgrep-prepare-header/footer ()
+(defun wgrep-prepare-header&footer ()
   (let (beg end)
     ;; Set read-only grep result header
     (goto-char (point-min))
@@ -580,7 +585,7 @@ non editable region.")
         (put-text-property beg end 'read-only t)
         (put-text-property beg end 'wgrep-footer t)))))
 
-(defun wgrep-set-header/footer-read-only (state)
+(defun wgrep-set-header&footer-read-only (state)
   (let ((inhibit-read-only t)
         (wgrep-inhibit-modification-hook t))
     ;; header
@@ -1082,7 +1087,7 @@ Example:
   (let ((modified (buffer-modified-p))
         (read-only (not wgrep-readonly-state)))
     (wgrep-set-readonly-area read-only)
-    (wgrep-set-header/footer-read-only read-only)
+    (wgrep-set-header&footer-read-only read-only)
     (set-buffer-modified-p modified)
     (if wgrep-readonly-state
         (message "Removing the whole line is now disabled.")
@@ -1161,7 +1166,6 @@ This change will be applied when \\[wgrep-finish-edit]."
     (define-key map "\C-c\C-r" 'wgrep-remove-change)
     (define-key map "\C-x\C-s" 'wgrep-finish-edit)
     (define-key map "\C-c\C-u" 'wgrep-remove-all-change)
-    (define-key map "\C-c\C-[" 'wgrep-remove-all-change)
     (define-key map "\C-c\C-k" 'wgrep-abort-changes)
     (define-key map "\C-x\C-q" 'wgrep-exit)
 

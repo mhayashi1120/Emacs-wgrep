@@ -1,10 +1,10 @@
-;;; wgrep-helm.el --- Writable helm-grep-mode buffer and apply the changes to files -*- lexical-binding: t -*-
+;;; wgrep-helm.el --- Writable helm-grep-mode buffer -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2020,2023 Masahiro Hayashi
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Keywords: grep edit extensions
-;; Package-Requires: ((wgrep "3.0.0"))
+;; Package-Requires: ((emacs "25.1") (wgrep "3.0.0"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-helm.el
 ;; Emacs: GNU Emacs 25 or later
 ;; Version: 3.0.0
@@ -48,13 +48,13 @@
 
 ;;;###autoload
 (defun wgrep-helm-setup ()
-  (set (make-local-variable 'wgrep-header/footer-parser)
-       'wgrep-helm-prepare-header/footer)
+  (set (make-local-variable 'wgrep-header&footer-parser)
+       'wgrep-helm-prepare-header&footer)
   (set (make-local-variable 'wgrep-results-parser)
        'wgrep-helm-parse-command-results)
   (wgrep-setup-internal))
 
-(defun wgrep-helm-prepare-header/footer ()
+(defun wgrep-helm-prepare-header&footer ()
   (let (beg end)
     ;; Set read-only grep result header
     (setq beg (point-min))

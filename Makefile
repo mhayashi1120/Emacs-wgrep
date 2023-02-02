@@ -1,40 +1,65 @@
+-include env.mk
+
 EMACS ?= emacs
 BATCH := $(EMACS) -q -batch -L .
-TEST_BATCH := $(BATCH) -l ./ext/dash.el -l ./ext/s.el
 
-ELC := *.elc
-GENERATED := $(ELC)
+TEST_BATCH := $(BATCH) -l $(DASH-EL) -l $(S-EL)
+
+# NOTE: This come from `pacakge-lint/run-tests.sh`
+LINT_BATCH := $(BATCH) -eval "(progn \
+   (require 'package) \
+   (push '(\"melpa\" . \"https://melpa.org/packages/\") package-archives) \
+   (package-initialize) \
+   (package-refresh-contents))"
+
+EL = wgrep.el
+EL += wgrep-ack.el
+EL += wgrep-ag.el
+EL += wgrep-helm.el
+EL += wgrep-pt.el
+
+ELC := $(EL:%.el=%.elc)
+
+LOAD_EL := $(EL:%=-l %)
+LOAD_ELC := $(ELC:%=-l %)
+
+GENERATED := *.elc
+
+###
+### General target
+###
+
+all: check
 
 check: compile
 	$(TEST_BATCH) -l wgrep.el -l wgrep-test.el -f ert-run-tests-batch-and-exit
 	$(TEST_BATCH) -l wgrep.elc -l wgrep-test.el -f ert-run-tests-batch-and-exit
 
-check2: check download-external subtest
-
-subtest:
-	$(BATCH) \
-		-L ./ext -l wgrep.el -l wgrep-ag.el -l wgrep-helm.el -l wgrep-ack.el -l wgrep-pt.el \
-		-l ext/ag.el \
-		-l wgrep-test.el -l wgrep-subtest.el \
-		-eval "(ert-run-tests-batch-and-exit '(tag wgrep-subtest))"
-	$(BATCH) \
-		-L ./ext -l wgrep.elc -l wgrep-ag.elc -l wgrep-helm.elc -l wgrep-ack.elc -l wgrep-pt.elc \
-		-l ext/ag.el \
-		-l wgrep-test.el -l wgrep-subtest.el \
-		-eval "(ert-run-tests-batch-and-exit '(tag wgrep-subtest))"
-
-download-external: clean-ext
-	mkdir -p ext
-	cd ext && wget "https://github.com/Wilfred/ag.el/raw/master/ag.el"
-	cd ext && wget "https://github.com/magnars/dash.el/raw/master/dash.el"
-	cd ext && wget "https://github.com/magnars/s.el/raw/master/s.el"
-
 compile:
-	$(BATCH) -f batch-byte-compile \
-		wgrep.el wgrep-ag.el wgrep-helm.el wgrep-ack.el wgrep-pt.el
-
-clean-ext:
-	rm -rf ext
+	$(BATCH) -f batch-byte-compile $(EL)
 
 clean:
 	rm -f $(GENERATED)
+
+###
+### for Package maintainer
+###
+
+lint:
+	$(LINT_BATCH) -l $(PACKAGE-LINT-EL) -f package-lint-batch-and-exit $(EL)
+
+check-extra: check subtest
+
+subtest:
+	$(TEST_BATCH) \
+		-l $(AG-EL) \
+		$(LOAD_EL) \
+		-l wgrep-test.el -l wgrep-subtest.el \
+		-eval "(ert-run-tests-batch-and-exit '(tag wgrep-subtest))"
+	$(TEST_BATCH) \
+		-l $(AG-EL) \
+		$(LOAD_ELC) \
+		-l wgrep-test.el -l wgrep-subtest.el \
+		-eval "(ert-run-tests-batch-and-exit '(tag wgrep-subtest))"
+
+package: lint check check-extra compile

@@ -1,6 +1,7 @@
 ;;; wgrep.el --- Writable grep buffer -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2020,2023 Masahiro Hayashi
+;; Copyright (C) 2002-2009 Matsushita Akihisa <akihisa@mail.ne.jp>
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Keywords: grep edit extensions
@@ -23,8 +24,6 @@
 ;; along with GNU Emacs; see the file COPYING.  If not, write to the
 ;; Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 ;; Boston, MA 02110-1301, USA.
-
-;; Copyright (C) 2002-2009 Matsushita Akihisa <akihisa@mail.ne.jp>
 
 ;;; Commentary:
 

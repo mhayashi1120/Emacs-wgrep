@@ -1,71 +1,112 @@
+###
+### Package
+###
+
 -include env.mk
 
 EMACS ?= emacs
-BATCH := $(EMACS) -q -batch -L .
+NEEDED-PACKAGES ?=
 
-TEST_BATCH := $(BATCH) -l $(DASH-EL) -l $(S-EL)
+BATCH := $(EMACS) -Q -batch -L .
 
-# NOTE: This come from `pacakge-lint/run-tests.sh`
-LINT_BATCH := $(BATCH) -eval "(progn \
-   (require 'package) \
-   (push '(\"melpa\" . \"https://melpa.org/packages/\") package-archives) \
-   (package-initialize) \
-   (package-refresh-contents))"
-
-EL = wgrep.el
+EL := wgrep.el
 EL += wgrep-ack.el
 EL += wgrep-ag.el
 EL += wgrep-helm.el
 EL += wgrep-pt.el
 
+TEST_EL := wgrep-test.el
+
+##
+## package.el
+##
+
+ifdef ELPA-DIR
+	BATCH += -eval "(setq package-user-dir (expand-file-name \"$(ELPA-DIR)\"))"
+endif
+
+# This come from `package-lint/run-tests.sh`
+define package-installer
+  "(progn \
+   (require 'package) \
+   (push '(\"melpa\" . \"https://melpa.org/packages/\") package-archives) \
+   (package-initialize) \
+   (package-refresh-contents) \
+   (dolist (pkg '($(1))) \
+    (unless (package-installed-p pkg) \
+      (package-install pkg))))"
+endef
+
+###
+### Command
+###
+
+BUILD_BATCH := $(BATCH) -eval "(require 'package)" -f package-initialize
+ifndef EMACS_LINT_IGNORE
+	BUILD_BATCH += -eval "(setq byte-compile-error-on-warn t)"
+endif
+
+ifdef EMACS_LINT_IGNORE
+	LINT_BATCH := true
+else
+	LINT_BATCH := $(BATCH) -eval $(call package-installer, package-lint)
+endif
+
+CI_BATCH := $(BATCH) -eval $(call package-installer, package-lint $(NEEDED-PACKAGES))
+
+###
+### Files
+###
+
 ELC := $(EL:%.el=%.elc)
+BUILD_GENERATED := *.elc
+MAINTAINER_GENERATED := elpa *~
 
 LOAD_EL := $(EL:%=-l %)
 LOAD_ELC := $(ELC:%=-l %)
 
-GENERATED := *.elc
+LOAD_TEST_EL := $(TEST_EL:%=-l %)
 
 ###
-### General target
+### General rule
 ###
+
+.PHONY: all check compile clean
 
 all: check
 
 check: compile
-	$(TEST_BATCH) -l wgrep.el -l wgrep-test.el -f ert-run-tests-batch-and-exit
-	$(TEST_BATCH) -l wgrep.elc -l wgrep-test.el -f ert-run-tests-batch-and-exit
+	$(BUILD_BATCH) $(LOAD_EL) $(LOAD_TEST_EL) -f ert-run-tests-batch-and-exit
+	$(BUILD_BATCH) $(LOAD_ELC) $(LOAD_TEST_EL) -f ert-run-tests-batch-and-exit
 
 compile:
-	$(BATCH) -f batch-byte-compile $(EL)
+	$(BUILD_BATCH) -f batch-byte-compile $(EL)
 
 clean:
-	rm -f $(GENERATED)
+	rm -rf $(BUILD_GENERATED)
 
 ###
-### for Package maintainer
+### Maintainer rule
 ###
+
+.PHONY: lint package maintainer-clean
 
 lint:
-	$(LINT_BATCH) -l $(PACKAGE-LINT-EL) -f package-lint-batch-and-exit $(EL)
+	$(LINT_BATCH) -f package-lint-batch-and-exit $(EL)
 
-check-extra: check subtest
+package: lint check compile
 
-subtest:
-	$(TEST_BATCH) \
-		-l $(AG-EL) \
-		$(LOAD_EL) \
-		-l wgrep-test.el -l wgrep-subtest.el \
-		-eval "(ert-run-tests-batch-and-exit '(tag wgrep-subtest))"
-	$(TEST_BATCH) \
-		-l $(AG-EL) \
-		$(LOAD_ELC) \
-		-l wgrep-test.el -l wgrep-subtest.el \
-		-eval "(ert-run-tests-batch-and-exit '(tag wgrep-subtest))"
 
-package: lint check check-extra compile
-	@echo ""
-	@echo "======================================="
-	@echo "Successfuly finished package build. "
-	@echo "Maintainer should add correct `git tag` each pacakges."
-	@echo "======================================="
-	@echo ""
+maintainer-clean: clean
+	rm -rf $(MAINTAINER_GENERATED)
+
+###
+### CI/CD rule
+###
+
+.PHONY: ci prepare-cicd
+
+ci: prepare-cicd package
+
+prepare-cicd:
+	$(CI_BATCH)

@@ -4,10 +4,7 @@
 
 -include env.mk
 
-EMACS ?= emacs
 NEEDED-PACKAGES ?=
-
-BATCH := $(EMACS) -Q -batch -L .
 
 EL := wgrep.el
 EL += wgrep-ack.el
@@ -16,6 +13,14 @@ EL += wgrep-helm.el
 EL += wgrep-pt.el
 
 TEST_EL := wgrep-test.el
+
+##
+## Emacs
+##
+
+EMACS ?= emacs
+
+BATCH := $(EMACS) -Q -batch -L .
 
 ##
 ## package.el

@@ -100,7 +100,7 @@ clean:
 lint:
 	$(LINT_BATCH) -f package-lint-batch-and-exit $(EL)
 
-package: lint check compile
+package: lint check
 
 
 maintainer-clean: clean

@@ -4,7 +4,7 @@
 
 -include env.mk
 
-NEEDED-PACKAGES ?=
+NEEDED-PACKAGES ?= dash ag s
 
 EL := wgrep.el
 EL += wgrep-ack.el

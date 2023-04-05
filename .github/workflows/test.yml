@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  schedule:
+    - cron: '22 23 * * 5'
   pull_request:
   push:
     paths-ignore:

@@ -11,6 +11,7 @@ EL += wgrep-ack.el
 EL += wgrep-ag.el
 EL += wgrep-helm.el
 EL += wgrep-pt.el
+EL += wgrep-deadgrep.el
 
 TEST_EL := wgrep-test.el
 

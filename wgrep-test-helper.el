@@ -4,24 +4,24 @@
 
 (require 'wgrep)
 
-(defun wgre-test-helper--wait (buf)
+(defun wgrep-test-helper--wait (buf)
   (let ((proc (get-buffer-process buf)))
     (while (eq (process-status proc) 'run)
       (sit-for 0.1))
     (sleep-for 0.2)
     (switch-to-buffer buf)))
 
-(defun wgre-test-helper--grep (command)
+(defun wgrep-test-helper--grep (command)
   (let ((buf (grep command)))
-    (wgre-test-helper--wait buf)))
+    (wgrep-test-helper--wait buf)))
 
-(defun wgre-test-helper--get-contents (file &optional cs)
+(defun wgrep-test-helper--get-contents (file &optional cs)
   (let ((coding-system-for-read cs))
     (with-temp-buffer
       (insert-file-contents file)
       (buffer-string))))
 
-(defun wgre-test-helper--prepare-file (file contents &optional cs)
+(defun wgrep-test-helper--prepare-file (file contents &optional cs)
   ;; cleanup for convenience
   (let ((buf (get-file-buffer file)))
     (when (buffer-live-p buf)
@@ -29,13 +29,13 @@
   (let ((coding-system-for-write cs))
     (write-region contents nil file)))
 
-(defun wgre-test-helper--cleanup-file (file)
+(defun wgrep-test-helper--cleanup-file (file)
   (when (file-exists-p file)
     (delete-file file))
   (when (file-exists-p (concat file "~"))
     (delete-file (concat file "~"))))
 
-(defmacro wgre-test-helper--default (&rest body)
+(defmacro wgrep-test-helper--default (&rest body)
   `(let ((wgrep-change-readonly-file nil)
          (wgrep-auto-save-buffer nil))
      (progn ,@body)))
@@ -51,4 +51,4 @@
   (wgrep-test-helper--wait (current-buffer)))
 
 
-(provide 'wgre-test-helper-helper)
+(provide 'wgrep-test-helper)

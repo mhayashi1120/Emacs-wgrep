@@ -24,7 +24,7 @@
 
 (ert-deftest wgrep-normal ()
   :tags '(wgrep)
-  (wgrep-test/default
+  (wgrep-test-helper--default
    (wgrep-test-fixture "HOGE\nFOO\nBAZ\n"
      (lambda (file)
        (wgrep-test-helper--grep (concat "grep -nH -e FOO -C 1 " file))
@@ -52,7 +52,7 @@
 
 (ert-deftest wgrep-normal-with-newline ()
   :tags '(wgrep)
-  (wgrep-test/default
+  (wgrep-test-helper--default
    (wgrep-test-fixture "HOGE\n"
      (lambda (file)
        (wgrep-test-helper--grep (concat "grep -nH -e HOGE " file))
@@ -72,7 +72,7 @@
 
 (ert-deftest wgrep-bom-with-multibyte ()
   :tags '(wgrep)
-  (wgrep-test/default
+  (wgrep-test-helper--default
    (wgrep-test-fixture '("あ\nい\nう\n" utf-8-with-signature)
      (lambda (file)
        (wgrep-test-helper--grep (concat "grep -nH -e 'あ' -A 2 " file))
@@ -95,7 +95,7 @@
 
 (ert-deftest wgrep-bom-with-unibyte ()
   :tags '(wgrep)
-  (wgrep-test/default
+  (wgrep-test-helper--default
    (wgrep-test-fixture '("a\nb\n" utf-8-with-signature)
      (lambda (file)
        (wgrep-test-helper--grep (concat "grep -nH -e 'a' -A 2 " file))
@@ -113,7 +113,7 @@
 
 (ert-deftest wgrep-with-modify ()
   :tags '(wgrep)
-  (wgrep-test/default
+  (wgrep-test-helper--default
    (wgrep-test-fixture "a\nb\nc\n"
      (lambda (file)
        (let (;; This test intended to check modified buffer is existing.
@@ -147,7 +147,7 @@
 
 (ert-deftest wgrep-with-readonly-file ()
   :tags '(wgrep)
-  (wgrep-test/default
+  (wgrep-test-helper--default
    (wgrep-test-fixture "a\nb\nc\n"
      (lambda (file)
        ;; make readonly

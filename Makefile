@@ -12,9 +12,9 @@ EL += wgrep-ag.el
 EL += wgrep-helm.el
 EL += wgrep-pt.el
 EL += wgrep-deadgrep.el
-EL += wgrep-test-helper.el
 
 TEST_EL := wgrep-test.el
+TEST_EL += wgrep-test-helper.el
 
 ##
 ## Emacs

@@ -1,23 +1,13 @@
 (require 'ert)
-(require 'wgrep-test)
+(require 'wgrep-test-helper)
 (require 'ag)
-
-(defun wgrep-test--ag (string file)
-  (let ((buf (ag/search string default-directory :file-regex (regexp-quote file) :regexp t)))
-    (wgrep-test--wait buf)))
-
-(defun wgrep-test--deadgrep (string)
-  (let ((deadgrep-project-root-function (lambda () default-directory))
-        (deadgrep--search-type 'regexp))
-    (deadgrep string))
-  (wgrep-test--wait (current-buffer)))
 
 (ert-deftest wgrep-ag-normal ()
   :tags '(wgrep-subtest)
   (wgrep-test/default
    (wgrep-test-fixture "HOGE\nFOO\nBAZ\n"
      (lambda (file)
-       (wgrep-test--ag "FOO|HOGE" file)
+       (wgrep-test-helper--ag "FOO|HOGE" file)
        (wgrep-change-to-wgrep-mode)
        (goto-char (point-min))
        (wgrep-goto-first-found)
@@ -33,14 +23,14 @@
        ;; save to file
        (wgrep-save-all-buffers)
        ;; compare file contents is valid
-       (should (equal "FOO2\nBAZ\n" (wgrep-test--get-contents file)))))))
+       (should (equal "FOO2\nBAZ\n" (wgrep-test-helper--get-contents file)))))))
 
 (ert-deftest wgrep-deadgrep-normal ()
   :tags '(wgrep-subtest)
   (wgrep-test/default
    (wgrep-test-fixture "HOGE\nFOO\nBAZ\n"
      (lambda (file)
-       (wgrep-test--deadgrep "FOO|HOGE")
+       (wgrep-test-helper--deadgrep "FOO|HOGE")
        (wgrep-change-to-wgrep-mode)
        (goto-char (point-min))
        (wgrep-goto-first-found)
@@ -56,4 +46,4 @@
        ;; save to file
        (wgrep-save-all-buffers)
        ;; compare file contents is valid
-       (should (equal "FOO2\nBAZ\n" (wgrep-test--get-contents file)))))))
+       (should (equal "FOO2\nBAZ\n" (wgrep-test-helper--get-contents file)))))))

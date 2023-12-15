@@ -1,6 +1,8 @@
 wgrep.el
 ========
 
+[![CI](https://github.com/mhayashi1120/Emacs-wgrep/actions/workflows/test.yml/badge.svg)](https://github.com/mhayashi1120/Emacs-wgrep/actions/workflows/test.yml)
+
 ## Summary:
 
 wgrep allows you to edit a grep buffer and apply those changes to

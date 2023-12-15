@@ -1,11 +1,11 @@
-;;; wgrep-deadgrep.el --- Writable deadgrep buffer and apply the changes to files
+;;; wgrep-deadgrep.el --- Writable deadgrep buffer and apply the changes to files -*- lexical-binding: t -*-
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>, Iku Iwasa <iku.iwasa@gmail.com>
 ;; Keywords: grep edit extensions
 ;; Package-Requires: ((wgrep "2.3.0"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-deadgrep.el
 ;; Emacs: GNU Emacs 25 or later
-;; Version: 2.3.0
+;; Version: 2.3.1
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as

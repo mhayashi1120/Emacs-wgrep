@@ -2,7 +2,7 @@
 
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>, Iku Iwasa <iku.iwasa@gmail.com>
 ;; Keywords: grep edit extensions
-;; Package-Requires: ((wgrep "2.3.0"))
+;; Package-Requires: ((wgrep "2.3.0") (emacs "25.1"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-deadgrep.el
 ;; Emacs: GNU Emacs 25 or later
 ;; Version: 2.3.1

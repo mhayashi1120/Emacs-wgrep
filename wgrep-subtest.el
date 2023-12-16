@@ -5,7 +5,7 @@
 (ert-deftest wgrep-ag-normal ()
   :tags '(wgrep-subtest)
   (wgrep-test-helper--default
-   (wgrep-test-fixture "HOGE\nFOO\nBAZ\n"
+   (wgrep-test-helper-fixture "HOGE\nFOO\nBAZ\n"
      (lambda (file)
        (wgrep-test-helper--ag "FOO|HOGE" file)
        (wgrep-change-to-wgrep-mode)
@@ -28,7 +28,7 @@
 (ert-deftest wgrep-deadgrep-normal ()
   :tags '(wgrep-subtest)
   (wgrep-test-helper--default
-   (wgrep-test-fixture "HOGE\nFOO\nBAZ\n"
+   (wgrep-test-helper-fixture "HOGE\nFOO\nBAZ\n"
      (lambda (file)
        (wgrep-test-helper--deadgrep "FOO|HOGE")
        (wgrep-change-to-wgrep-mode)

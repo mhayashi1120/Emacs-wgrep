@@ -3,29 +3,10 @@
 (require 's)
 (require 'wgrep-test-helper)
 
-(defun wgrep-test-fixture (data body-fn)
-  (let ((test-directory (expand-file-name "test-work" default-directory)))
-    (unless (file-directory-p test-directory)
-      (make-directory test-directory t))
-    (let ((default-directory (file-name-as-directory test-directory)))
-      (let ((file (concat (make-temp-name "test-data") ".txt")))
-        (pcase data
-          ((pred stringp)
-           (wgrep-test-helper--prepare-file file data))
-          (`(,(and (pred stringp) data) ,(and (pred coding-system-p) cs))
-           (wgrep-test-helper--prepare-file file data cs))
-          (_
-           (error "DATA should be STRING or (STRING CODING-SYSTEM)")))
-        (unwind-protect
-            (funcall body-fn file)
-          (wgrep-test-helper--cleanup-file file))))))
-
-(put 'wgrep-test-fixture 'lisp-indent-function 1)
-
 (ert-deftest wgrep-normal ()
   :tags '(wgrep)
   (wgrep-test-helper--default
-   (wgrep-test-fixture "HOGE\nFOO\nBAZ\n"
+   (wgrep-test-helper-fixture "HOGE\nFOO\nBAZ\n"
      (lambda (file)
        (wgrep-test-helper--grep (concat "grep -nH -e FOO -C 1 " file))
        (wgrep-change-to-wgrep-mode)
@@ -53,7 +34,7 @@
 (ert-deftest wgrep-normal-with-newline ()
   :tags '(wgrep)
   (wgrep-test-helper--default
-   (wgrep-test-fixture "HOGE\n"
+   (wgrep-test-helper-fixture "HOGE\n"
      (lambda (file)
        (wgrep-test-helper--grep (concat "grep -nH -e HOGE " file))
        (wgrep-change-to-wgrep-mode)
@@ -73,7 +54,7 @@
 (ert-deftest wgrep-bom-with-multibyte ()
   :tags '(wgrep)
   (wgrep-test-helper--default
-   (wgrep-test-fixture '("あ\nい\nう\n" utf-8-with-signature)
+   (wgrep-test-helper-fixture '("あ\nい\nう\n" utf-8-with-signature)
      (lambda (file)
        (wgrep-test-helper--grep (concat "grep -nH -e 'あ' -A 2 " file))
        (wgrep-change-to-wgrep-mode)
@@ -96,7 +77,7 @@
 (ert-deftest wgrep-bom-with-unibyte ()
   :tags '(wgrep)
   (wgrep-test-helper--default
-   (wgrep-test-fixture '("a\nb\n" utf-8-with-signature)
+   (wgrep-test-helper-fixture '("a\nb\n" utf-8-with-signature)
      (lambda (file)
        (wgrep-test-helper--grep (concat "grep -nH -e 'a' -A 2 " file))
        (wgrep-change-to-wgrep-mode)
@@ -114,7 +95,7 @@
 (ert-deftest wgrep-with-modify ()
   :tags '(wgrep)
   (wgrep-test-helper--default
-   (wgrep-test-fixture "a\nb\nc\n"
+   (wgrep-test-helper-fixture "a\nb\nc\n"
      (lambda (file)
        (let (;; This test intended to check modified buffer is existing.
              ;; Keep that buffer is modifying while calling grep.
@@ -148,7 +129,7 @@
 (ert-deftest wgrep-with-readonly-file ()
   :tags '(wgrep)
   (wgrep-test-helper--default
-   (wgrep-test-fixture "a\nb\nc\n"
+   (wgrep-test-helper-fixture "a\nb\nc\n"
      (lambda (file)
        ;; make readonly
        (set-file-modes file ?\400)

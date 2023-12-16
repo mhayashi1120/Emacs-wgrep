@@ -50,5 +50,23 @@
     (deadgrep string))
   (wgrep-test-helper--wait (current-buffer)))
 
+(defun wgrep-test-helper-fixture (data body-fn)
+  (let ((test-directory (expand-file-name "test-work" default-directory)))
+    (unless (file-directory-p test-directory)
+      (make-directory test-directory t))
+    (let ((default-directory (file-name-as-directory test-directory)))
+      (let ((file (concat (make-temp-name "test-data") ".txt")))
+        (pcase data
+          ((pred stringp)
+           (wgrep-test-helper--prepare-file file data))
+          (`(,(and (pred stringp) data) ,(and (pred coding-system-p) cs))
+           (wgrep-test-helper--prepare-file file data cs))
+          (_
+           (error "DATA should be STRING or (STRING CODING-SYSTEM)")))
+        (unwind-protect
+            (funcall body-fn file)
+          (wgrep-test-helper--cleanup-file file))))))
+
+(put 'wgrep-test-helper-fixture 'lisp-indent-function 1)
 
 (provide 'wgrep-test-helper)

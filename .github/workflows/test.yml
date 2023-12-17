@@ -31,7 +31,6 @@ jobs:
           - snapshot
     env:
       EMACS_LINT_IGNORE: ${{ matrix.lint_ignore }}
-      LANGTOOL_POPUP_IGNORE: ${{ matrix.ignore_popup }}
     steps:
     - uses: purcell/setup-emacs@master
       with:

@@ -64,6 +64,7 @@
           (_
            (error "DATA should be STRING or (STRING CODING-SYSTEM)")))
         (unwind-protect
+            (setenv "LC_ALL" "C.UTF-8")
             (funcall body-fn file)
           (wgrep-test-helper--cleanup-file file))))))
 

@@ -17,18 +17,21 @@ jobs:
           - ubuntu-latest
           - macos-latest
         emacs_version:
-          - 25.1
-          - 25.2
-          - 25.3
-          - 26.1
-          - 26.2
-          - 26.3
-          - 27.1
-          - 27.2
           - 28.1
           - 28.2
           - 29.1
+          - 29.2
+          - 29.3
           - snapshot
+        include:
+          - os: ubuntu-latest
+            emacs_version: 24.5
+          - os: ubuntu-latest
+            emacs_version: 25.3
+          - os: ubuntu-latest
+            emacs_version: 26.3
+          - os: ubuntu-latest
+            emacs_version: 27.2
     env:
       EMACS_LINT_IGNORE: ${{ matrix.lint_ignore }}
     steps:

@@ -5,7 +5,7 @@
 ;; Author: Masahiro Hayashi <mhayashi1120@gmail.com>
 ;; Contributor: Ivan Andrus <darthandrus@gmail.com>
 ;; Keywords: grep edit extensions
-;; Package-Requires: ((emacs "25.1") (wgrep "3.0.0"))
+;; Package-Requires: ((ack) (emacs "25.1") (wgrep "3.0.0"))
 ;; URL: http://github.com/mhayashi1120/Emacs-wgrep/raw/master/wgrep-ack.el
 ;; Emacs: GNU Emacs 25 or later
 ;; Version: 1.0.0
@@ -27,14 +27,14 @@
 
 ;;; Commentary:
 
-;; wgrep-ack allows you to edit a ack-and-a-half buffer and apply those
-;; changes to the file buffer.
+;; wgrep-ack allows you to edit an ack buffer and apply those changes to
+;; the file buffer.
 
 ;;; Install:
 
-;; 1. Install ack-and-a-half.el
+;; 1. Install ack.el
 ;;
-;;   https://github.com/jhelwig/ack-and-a-half
+;;   https://github.com/leoliu/ack-el
 
 ;; 2. Install wgrep.el
 

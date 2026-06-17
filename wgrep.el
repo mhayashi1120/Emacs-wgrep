@@ -148,6 +148,22 @@ Key to enable `wgrep-mode'."
   :group 'wgrep
   :type 'number)
 
+(defcustom wgrep-support-column-numbers t
+  "Non-nil means consume the optional column number in grep output.
+When non-nil, `wgrep-setup' extends the buffer-local
+`wgrep-line-file-regexp' to optionally match the column number
+emitted by grep's `--column' option (e.g. `git grep --column',
+`ag --vimgrep').  Without this, the column number leaks into the
+line content wgrep records as the \"old text\", and applying edits
+fails with \"Buffer was changed after grep.\" even though the file
+is unchanged.
+
+Set to nil to restore the previous behavior.  This is mainly useful
+to avoid a (very rare) ambiguity when grep is invoked without
+`--column' and a matched line actually starts with `N:'."
+  :group 'wgrep
+  :type 'boolean)
+
 (defvar wgrep-setup-hook nil
   "Hooks to run when setting up wgrep.")
 
@@ -192,6 +208,17 @@ Key to enable `wgrep-mode'."
 
   (defconst wgrep-colon-file-separator-header-regexp
     "\\(?1:[^\n:]+?[^\n/:]\\):[\t ]*\\(?3:[1-9][0-9]*\\)[\t ]*:"))
+
+;; Regexp fragments appended to the header regexps above when
+;; `wgrep-support-column-numbers' is non-nil, to consume the optional
+;; column number emitted by grep's `--column' option (e.g.
+;; `git grep --column', `ag --vimgrep').
+(eval-and-compile
+  (defconst wgrep-null-file-separator-column-suffix-regexp
+    "\\(?:[0-9]+:\\)?")
+
+  (defconst wgrep-colon-file-separator-column-suffix-regexp
+    "\\(?:[\t ]*[1-9][0-9]*[\t ]*:\\)?"))
 
 ;; Generalized regexp, but wrong matching when colon `:' and null `\0'
 ;; is contained in grep result.
@@ -1186,21 +1213,24 @@ This change will be applied when \\[wgrep-finish-edit]."
 ;;;###autoload
 (defun wgrep-setup ()
   "Setup wgrep preparation."
-  (cond
-   ((and (boundp 'grep-use-null-filename-separator)
-         grep-use-null-filename-separator
-         ;; FIXME: command may contain "--null" text in search text
-         ;; (e.g. grep -nH -e "searching --null argument")
-         ;; `grep-use-null-filename-separator' is non-nil
-         ;; enough to reduce that confusion.
-         (let ((command (car-safe compilation-arguments)))
-           (and (stringp command)
-                (string-match "[\s\t]--null[\s\t]" command))))
+  (let* ((null-mode (and (boundp 'grep-use-null-filename-separator)
+                         grep-use-null-filename-separator
+                         ;; FIXME: command may contain "--null" text in search
+                         ;; text (e.g. grep -nH -e "searching --null argument")
+                         ;; `grep-use-null-filename-separator' is non-nil
+                         ;; enough to reduce that confusion.
+                         (let ((command (car-safe compilation-arguments)))
+                           (and (stringp command)
+                                (string-match "[\s\t]--null[\s\t]" command)))))
+         (header (if null-mode
+                     wgrep-null-file-separator-header-regexp
+                   wgrep-colon-file-separator-header-regexp))
+         (column-suffix (and wgrep-support-column-numbers
+                             (if null-mode
+                                 wgrep-null-file-separator-column-suffix-regexp
+                               wgrep-colon-file-separator-column-suffix-regexp))))
     (set (make-local-variable 'wgrep-line-file-regexp)
-         wgrep-null-file-separator-header-regexp))
-   (t
-    (set (make-local-variable 'wgrep-line-file-regexp)
-         wgrep-colon-file-separator-header-regexp)))
+         (if column-suffix (concat header column-suffix) header)))
   (wgrep-setup-internal))
 
 ;;;
